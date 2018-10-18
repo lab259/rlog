@@ -2,7 +2,7 @@ package main
 
 //import "time"
 import "os"
-import "github.com/romana/rlog"
+import "github.com/lab259/rlog"
 
 func someRecursiveFunction(x int) {
 	// The Trace log functions allow you to set a log level with a numeric
