@@ -28,7 +28,11 @@ func (logger *Logger) Trace(traceLevel int, a ...interface{}) {
 	defer initMutex.RUnlock()
 	if len(traceFilterSpec.filters) > 0 {
 		prefixAddition := fmt.Sprintf("(%d)", traceLevel)
-		basicLog(levelTrace, traceLevel, true, logger.ContextInfo, "", prefixAddition, a...)
+		var info []interface{}
+		if logger != nil {
+			info = logger.ContextInfo
+		}
+		basicLog(levelTrace, traceLevel, true, info, "", prefixAddition, a...)
 	}
 }
 
@@ -40,36 +44,60 @@ func (logger *Logger) Tracef(traceLevel int, format string, a ...interface{}) {
 	defer initMutex.RUnlock()
 	if len(traceFilterSpec.filters) > 0 {
 		prefixAddition := fmt.Sprintf("(%d)", traceLevel)
-		basicLog(levelTrace, traceLevel, true, logger.ContextInfo, format, prefixAddition, a...)
+		var info []interface{}
+		if logger != nil {
+			info = logger.ContextInfo
+		}
+		basicLog(levelTrace, traceLevel, true, info, format, prefixAddition, a...)
 	}
 }
 
 // Debug prints a message if RLOG_LEVEL is set to DEBUG.
 func (logger *Logger) Debug(a ...interface{}) {
-	basicLog(levelDebug, notATrace, false, logger.ContextInfo, "", "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelDebug, notATrace, false, info, "", "", a...)
 }
 
 // Debugf prints a message if RLOG_LEVEL is set to DEBUG, with formatting.
 func (logger *Logger) Debugf(format string, a ...interface{}) {
-	basicLog(levelDebug, notATrace, false, logger.ContextInfo, format, "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelDebug, notATrace, false, info, format, "", a...)
 }
 
 // Info prints a message if RLOG_LEVEL is set to INFO or lower.
 func (logger *Logger) Info(a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, logger.ContextInfo, "", "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelInfo, notATrace, false, info, "", "", a...)
 }
 
 // Infof prints a message if RLOG_LEVEL is set to INFO or lower, with
 // formatting.
 func (logger *Logger) Infof(format string, a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, logger.ContextInfo, format, "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelInfo, notATrace, false, info, format, "", a...)
 }
 
 // Println prints a message if RLOG_LEVEL is set to INFO or lower.
 // Println shouldn't be used except for backward compatibility
 // with standard log package, directly using Info is preferred way.
 func (logger *Logger) Println(a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, logger.ContextInfo, "", "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelInfo, notATrace, false, info, "", "", a...)
 }
 
 // Printf prints a message if RLOG_LEVEL is set to INFO or lower, with
@@ -77,38 +105,66 @@ func (logger *Logger) Println(a ...interface{}) {
 // Printf shouldn't be used except for backward compatibility
 // with standard log package, directly using Infof is preferred way.
 func (logger *Logger) Printf(format string, a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, logger.ContextInfo, format, "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelInfo, notATrace, false, info, format, "", a...)
 }
 
 // Warn prints a message if RLOG_LEVEL is set to WARN or lower.
 func (logger *Logger) Warn(a ...interface{}) {
-	basicLog(levelWarn, notATrace, false, logger.ContextInfo, "", "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelWarn, notATrace, false, info, "", "", a...)
 }
 
 // Warnf prints a message if RLOG_LEVEL is set to WARN or lower, with
 // formatting.
 func (logger *Logger) Warnf(format string, a ...interface{}) {
-	basicLog(levelWarn, notATrace, false, logger.ContextInfo, format, "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelWarn, notATrace, false, info, format, "", a...)
 }
 
 // Error prints a message if RLOG_LEVEL is set to ERROR or lower.
 func (logger *Logger) Error(a ...interface{}) {
-	basicLog(levelErr, notATrace, false, logger.ContextInfo, "", "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelErr, notATrace, false, info, "", "", a...)
 }
 
 // Errorf prints a message if RLOG_LEVEL is set to ERROR or lower, with
 // formatting.
 func (logger *Logger) Errorf(format string, a ...interface{}) {
-	basicLog(levelErr, notATrace, false, logger.ContextInfo, format, "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelErr, notATrace, false, info, format, "", a...)
 }
 
 // Critical prints a message if RLOG_LEVEL is set to CRITICAL or lower.
 func (logger *Logger) Critical(a ...interface{}) {
-	basicLog(levelCrit, notATrace, false, logger.ContextInfo, "", "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelCrit, notATrace, false, info, "", "", a...)
 }
 
 // Criticalf prints a message if RLOG_LEVEL is set to CRITICAL or lower, with
 // formatting.
 func (logger *Logger) Criticalf(format string, a ...interface{}) {
-	basicLog(levelCrit, notATrace, false, logger.ContextInfo, format, "", a...)
+	var info []interface{}
+	if logger != nil {
+		info = logger.ContextInfo
+	}
+	basicLog(levelCrit, notATrace, false, info, format, "", a...)
 }
