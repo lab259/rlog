@@ -25,5 +25,7 @@ _testmain.go
 
 *.swp
 
+vendor/
+
 .idea/
 .vscode/
