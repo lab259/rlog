@@ -16,7 +16,6 @@
 package rlog
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -84,28 +83,6 @@ type filter struct {
 	Pattern string
 	Level   int
 }
-
-// rlogConfig captures the entire configuration of rlog, as supplied by a user
-// via environment variables and/or config files. This still requires checking
-// and translation into more easily used config items. All values therefore are
-// stored as simple strings here.
-type rlogConfig struct {
-	logLevel        string // What log level. String, since filters are allowed
-	traceLevel      string // What trace level. String, since filters are allowed
-	logTimeFormat   string // The time format spec for date/time stamps in output
-	logFile         string // Name of logfile
-	confFile        string // Name of config file
-	logStream       string // Name of logstream: stdout, stderr or NONE
-	logNoTime       string // Flag to determine if date/time is logged at all
-	showCallerInfo  string // Flag to determine if caller info is logged
-	showGoroutineID string // Flag to determine if goroute ID shows in caller info
-	confCheckInterv string // Interval in seconds for checking config file
-}
-
-// We keep a copy of what was supplied via environment variables, since we will
-// consult this every time we read from a config file. This allows us to
-// determine which values take precedence.
-var configFromEnvVars rlogConfig
 
 // The configuration items in rlogConfig are what is supplied by the user
 // (usually via environment variables). They are not the actual running
@@ -276,98 +253,6 @@ func updateIfNeeded(oldVal string, newVal string, priority bool) string {
 		return newVal
 	}
 	return oldVal
-}
-
-// updateConfigFromFile reads a configuration from the specified config file.
-// It merges the supplied config with the new values.
-func updateConfigFromFile(config *rlogConfig) {
-	lastConfigFileCheck = time.Now()
-
-	settingConfFile = config.confFile
-	// If no config file was specified we will default to a known location.
-	if settingConfFile == "" {
-		execName := filepath.Base(os.Args[0])
-		settingConfFile = fmt.Sprintf("/etc/rlog/%s.conf", execName)
-	}
-
-	// Scan over the config file, line by line
-	file, err := os.Open(settingConfFile)
-	if err != nil {
-		// Any error while attempting to open the logfile ignored. In many
-		// cases there won't even be a config file, so we should not produce
-		// any noise.
-		return
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	i := 0
-	for scanner.Scan() {
-		i++
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || line[0] == '#' {
-			continue
-		}
-		tokens := strings.SplitN(line, "=", 2)
-		if len(tokens) == 0 {
-			continue
-		}
-		if len(tokens) != 2 {
-			rlogIssue("Malformed line in config file %s:%d. Ignored.",
-				settingConfFile, i)
-			continue
-		}
-		name := strings.TrimSpace(tokens[0])
-		val := strings.TrimSpace(tokens[1])
-
-		// If the name starts with a '!' then it should overwrite whatever we
-		// currently have in the config already.
-		priority := false
-		if name[0] == '!' {
-			priority = true
-			name = name[1:]
-		}
-
-		switch name {
-		case "RLOG_LOG_LEVEL":
-			config.logLevel = updateIfNeeded(config.logLevel, val, priority)
-		case "RLOG_TRACE_LEVEL":
-			config.traceLevel = updateIfNeeded(config.traceLevel, val, priority)
-		case "RLOG_TIME_FORMAT":
-			config.logTimeFormat = updateIfNeeded(config.logTimeFormat, val, priority)
-		case "RLOG_LOG_FILE":
-			config.logFile = updateIfNeeded(config.logFile, val, priority)
-		case "RLOG_LOG_STREAM":
-			val = strings.ToUpper(val)
-			config.logStream = updateIfNeeded(config.logStream, val, priority)
-		case "RLOG_LOG_NOTIME":
-			config.logNoTime = updateIfNeeded(config.logNoTime, val, priority)
-		case "RLOG_CALLER_INFO":
-			config.showCallerInfo = updateIfNeeded(config.showCallerInfo, val, priority)
-		case "RLOG_GOROUTINE_ID":
-			config.showGoroutineID = updateIfNeeded(config.showGoroutineID, val, priority)
-		default:
-			rlogIssue("Unknown or illegal setting name in config file %s:%d. Ignored.",
-				settingConfFile, i)
-		}
-	}
-}
-
-// configFromEnv extracts settings for our logger from environment variables.
-func configFromEnv() rlogConfig {
-	// Read the initial configuration from the environment variables
-	return rlogConfig{
-		logLevel:        os.Getenv("RLOG_LOG_LEVEL"),
-		traceLevel:      os.Getenv("RLOG_TRACE_LEVEL"),
-		logTimeFormat:   os.Getenv("RLOG_TIME_FORMAT"),
-		logFile:         os.Getenv("RLOG_LOG_FILE"),
-		confFile:        os.Getenv("RLOG_CONF_FILE"),
-		logStream:       strings.ToUpper(os.Getenv("RLOG_LOG_STREAM")),
-		logNoTime:       os.Getenv("RLOG_LOG_NOTIME"),
-		showCallerInfo:  os.Getenv("RLOG_CALLER_INFO"),
-		showGoroutineID: os.Getenv("RLOG_GOROUTINE_ID"),
-		confCheckInterv: os.Getenv("RLOG_CONF_CHECK_INTERVAL"),
-	}
 }
 
 // init loads configuration from the environment variables and the
@@ -569,7 +454,7 @@ func rlogIssue(prefix string, a ...interface{}) {
 // It checks what is configured to be included in the log message, decorates it
 // accordingly and assembles the entire line. It then uses the standard log
 // package to finally output the message.
-func basicLog(logLevel int, traceLevel int, isLocked bool, additionalInformation []interface{}, format string, prefixAddition string, a ...interface{}) {
+func basicLog(logLevel int, traceLevel int, isLocked bool, additionalInformation string, format string, prefixAddition string, a ...interface{}) {
 	now := time.Now()
 
 	// In some cases the caller already got this lock for us
@@ -639,15 +524,15 @@ func basicLog(logLevel int, traceLevel int, isLocked bool, additionalInformation
 	var msg string
 	if format != "" {
 		if len(additionalInformation) > 0 {
-			msg = fmt.Sprintln(fmt.Sprint(additionalInformation...), fmt.Sprint(a...))
+			msg = fmt.Sprintln(additionalInformation, fmt.Sprintf(format, a...))
 		} else {
-			msg = fmt.Sprintln(fmt.Sprint(additionalInformation...), fmt.Sprintf(format, a...))
+			msg = fmt.Sprintln(fmt.Sprintf(format, a...))
 		}
 	} else {
 		if len(additionalInformation) > 0 {
-			msg = fmt.Sprintln(fmt.Sprint(additionalInformation...), fmt.Sprint(a...))
+			msg = fmt.Sprintln(additionalInformation, fmt.Sprint(a...))
 		} else {
-			msg = fmt.Sprintln(a...)
+			msg = fmt.Sprint(a...)
 		}
 	}
 	levelDecoration := levelStrings[logLevel] + prefixAddition
@@ -685,7 +570,7 @@ func Trace(traceLevel int, a ...interface{}) {
 	defer initMutex.RUnlock()
 	if len(traceFilterSpec.filters) > 0 {
 		prefixAddition := fmt.Sprintf("(%d)", traceLevel)
-		basicLog(levelTrace, traceLevel, true, nil, "", prefixAddition, a...)
+		basicLog(levelTrace, traceLevel, true, "", "", prefixAddition, a...)
 	}
 }
 
@@ -697,36 +582,36 @@ func Tracef(traceLevel int, format string, a ...interface{}) {
 	defer initMutex.RUnlock()
 	if len(traceFilterSpec.filters) > 0 {
 		prefixAddition := fmt.Sprintf("(%d)", traceLevel)
-		basicLog(levelTrace, traceLevel, true, nil, format, prefixAddition, a...)
+		basicLog(levelTrace, traceLevel, true, "", format, prefixAddition, a...)
 	}
 }
 
 // Debug prints a message if RLOG_LEVEL is set to DEBUG.
 func Debug(a ...interface{}) {
-	basicLog(levelDebug, notATrace, false, nil, "", "", a...)
+	basicLog(levelDebug, notATrace, false, "", "", "", a...)
 }
 
 // Debugf prints a message if RLOG_LEVEL is set to DEBUG, with formatting.
 func Debugf(format string, a ...interface{}) {
-	basicLog(levelDebug, notATrace, false, nil, format, "", a...)
+	basicLog(levelDebug, notATrace, false, "", format, "", a...)
 }
 
 // Info prints a message if RLOG_LEVEL is set to INFO or lower.
 func Info(a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, nil, "", "", a...)
+	basicLog(levelInfo, notATrace, false, "", "", "", a...)
 }
 
 // Infof prints a message if RLOG_LEVEL is set to INFO or lower, with
 // formatting.
 func Infof(format string, a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, nil, format, "", a...)
+	basicLog(levelInfo, notATrace, false, "", format, "", a...)
 }
 
 // Println prints a message if RLOG_LEVEL is set to INFO or lower.
 // Println shouldn't be used except for backward compatibility
 // with standard log package, directly using Info is preferred way.
 func Println(a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, nil, "", "", a...)
+	basicLog(levelInfo, notATrace, false, "", "", "", a...)
 }
 
 // Printf prints a message if RLOG_LEVEL is set to INFO or lower, with
@@ -734,38 +619,38 @@ func Println(a ...interface{}) {
 // Printf shouldn't be used except for backward compatibility
 // with standard log package, directly using Infof is preferred way.
 func Printf(format string, a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, nil, format, "", a...)
+	basicLog(levelInfo, notATrace, false, "", format, "", a...)
 }
 
 // Warn prints a message if RLOG_LEVEL is set to WARN or lower.
 func Warn(a ...interface{}) {
-	basicLog(levelWarn, notATrace, false, nil, "", "", a...)
+	basicLog(levelWarn, notATrace, false, "", "", "", a...)
 }
 
 // Warnf prints a message if RLOG_LEVEL is set to WARN or lower, with
 // formatting.
 func Warnf(format string, a ...interface{}) {
-	basicLog(levelWarn, notATrace, false, nil, format, "", a...)
+	basicLog(levelWarn, notATrace, false, "", format, "", a...)
 }
 
 // Error prints a message if RLOG_LEVEL is set to ERROR or lower.
 func Error(a ...interface{}) {
-	basicLog(levelErr, notATrace, false, nil, "", "", a...)
+	basicLog(levelErr, notATrace, false, "", "", "", a...)
 }
 
 // Errorf prints a message if RLOG_LEVEL is set to ERROR or lower, with
 // formatting.
 func Errorf(format string, a ...interface{}) {
-	basicLog(levelErr, notATrace, false, nil, format, "", a...)
+	basicLog(levelErr, notATrace, false, "", format, "", a...)
 }
 
 // Critical prints a message if RLOG_LEVEL is set to CRITICAL or lower.
 func Critical(a ...interface{}) {
-	basicLog(levelCrit, notATrace, false, nil, "", "", a...)
+	basicLog(levelCrit, notATrace, false, "", "", "", a...)
 }
 
 // Criticalf prints a message if RLOG_LEVEL is set to CRITICAL or lower, with
 // formatting.
 func Criticalf(format string, a ...interface{}) {
-	basicLog(levelCrit, notATrace, false, nil, format, "", a...)
+	basicLog(levelCrit, notATrace, false, "", format, "", a...)
 }
