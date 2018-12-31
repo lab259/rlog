@@ -20,6 +20,17 @@ var _ = Describe("Config", func() {
 		Expect(config.LogLevel).To(Equal("CRITICAL"))
 	})
 
+	It("should load the log level from the env", func() {
+		OverrideEnv(map[string]string{
+			"RLOG_LOG_LEVEL": "CRITICAL",
+		}, func() error {
+			var config Config
+			config.LoadFromEnv("")
+			Expect(config.LogLevel).To(Equal("CRITICAL"))
+			return nil
+		})
+	})
+
 	It("should load the trace level from the stream", func() {
 		buff := bytes.NewBuffer(nil)
 		fmt.Fprintln(buff, "RLOG_TRACE_LEVEL=10")
@@ -27,6 +38,17 @@ var _ = Describe("Config", func() {
 		var config Config
 		Expect(config.loadFromStream(buff)).To(Succeed())
 		Expect(config.TraceLevel).To(Equal("10"))
+	})
+
+	It("should load the trace level from the env", func() {
+		OverrideEnv(map[string]string{
+			"RLOG_TRACE_LEVEL": "10",
+		}, func() error {
+			var config Config
+			config.LoadFromEnv("")
+			Expect(config.TraceLevel).To(Equal("10"))
+			return nil
+		})
 	})
 
 	It("should load the time format from the stream", func() {
@@ -38,6 +60,17 @@ var _ = Describe("Config", func() {
 		Expect(config.logTimeFormat).To(Equal("unix"))
 	})
 
+	It("should load the time format from the env", func() {
+		OverrideEnv(map[string]string{
+			"RLOG_TIME_FORMAT": "unix",
+		}, func() error {
+			var config Config
+			config.LoadFromEnv("")
+			Expect(config.logTimeFormat).To(Equal("unix"))
+			return nil
+		})
+	})
+
 	It("should load the log file from the stream", func() {
 		buff := bytes.NewBuffer(nil)
 		fmt.Fprintln(buff, "RLOG_LOG_FILE=log")
@@ -45,6 +78,17 @@ var _ = Describe("Config", func() {
 		var config Config
 		Expect(config.loadFromStream(buff)).To(Succeed())
 		Expect(config.LogFile).To(Equal("log"))
+	})
+
+	It("should load the log file from the env", func() {
+		OverrideEnv(map[string]string{
+			"RLOG_LOG_FILE": "log",
+		}, func() error {
+			var config Config
+			config.LoadFromEnv("")
+			Expect(config.LogFile).To(Equal("log"))
+			return nil
+		})
 	})
 
 	It("should load the log stream from the stream", func() {
@@ -56,6 +100,17 @@ var _ = Describe("Config", func() {
 		Expect(config.LogStream).To(Equal("STDOUT"))
 	})
 
+	It("should load the log file from the env", func() {
+		OverrideEnv(map[string]string{
+			"RLOG_LOG_STREAM": "stdout",
+		}, func() error {
+			var config Config
+			config.LoadFromEnv("")
+			Expect(config.LogStream).To(Equal("STDOUT"))
+			return nil
+		})
+	})
+
 	It("should load the no time flag from the stream", func() {
 		buff := bytes.NewBuffer(nil)
 		fmt.Fprintln(buff, "RLOG_LOG_NOTIME=true")
@@ -63,6 +118,17 @@ var _ = Describe("Config", func() {
 		var config Config
 		Expect(config.loadFromStream(buff)).To(Succeed())
 		Expect(config.LogNoTime).To(BeTrue())
+	})
+
+	It("should load the no time flag from the env", func() {
+		OverrideEnv(map[string]string{
+			"RLOG_LOG_NOTIME": "true",
+		}, func() error {
+			var config Config
+			config.LoadFromEnv("")
+			Expect(config.LogNoTime).To(BeTrue())
+			return nil
+		})
 	})
 
 	It("should load the caller info from the stream", func() {
@@ -74,6 +140,17 @@ var _ = Describe("Config", func() {
 		Expect(config.ShowCallerInfo).To(BeTrue())
 	})
 
+	It("should load the caller info from the env", func() {
+		OverrideEnv(map[string]string{
+			"RLOG_CALLER_INFO": "true",
+		}, func() error {
+			var config Config
+			config.LoadFromEnv("")
+			Expect(config.ShowCallerInfo).To(BeTrue())
+			return nil
+		})
+	})
+
 	It("should load the go routine id from the stream", func() {
 		buff := bytes.NewBuffer(nil)
 		fmt.Fprintln(buff, "RLOG_GOROUTINE_ID=true")
@@ -81,6 +158,17 @@ var _ = Describe("Config", func() {
 		var config Config
 		Expect(config.loadFromStream(buff)).To(Succeed())
 		Expect(config.ShowGoroutineID).To(BeTrue())
+	})
+
+	It("should load the go routine id from the env", func() {
+		OverrideEnv(map[string]string{
+			"RLOG_GOROUTINE_ID": "true",
+		}, func() error {
+			var config Config
+			config.LoadFromEnv("")
+			Expect(config.ShowGoroutineID).To(BeTrue())
+			return nil
+		})
 	})
 
 	It("should not fail when finding a unknown variable", func() {

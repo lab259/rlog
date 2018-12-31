@@ -26,7 +26,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -83,30 +82,6 @@ type filter struct {
 	Pattern string
 	Level   int
 }
-
-// The configuration items in rlogConfig are what is supplied by the user
-// (usually via environment variables). They are not the actual running
-// configuration.  We interpret this, combine it with configuration from the
-// config file and produce pre-processed configuration values, which are stored
-// in those variables below.
-var (
-	settingShowCallerInfo  bool   // whether we log caller info
-	settingShowGoroutineID bool   // whether we show goroutine ID in caller info
-	settingDateTimeFormat  string // flags for date/time output
-	settingConfFile        string // config file name
-	// how often we check the conf file
-	settingCheckInterval time.Duration = 15 * time.Second
-
-	logWriterStream     *log.Logger // the first writer to which output is sent
-	logWriterFile       *log.Logger // the second writer to which output is sent
-	logFilterSpec       *filterSpec // filters for log messages
-	traceFilterSpec     *filterSpec // filters for trace messages
-	lastConfigFileCheck time.Time   // when did we last check the config file
-	currentLogFile      *os.File    // the logfile currently in use
-	currentLogFileName  string      // name of current log file
-
-	initMutex sync.RWMutex = sync.RWMutex{} // used to protect the init section
-)
 
 // fromString initializes filterSpec from string.
 //
@@ -258,159 +233,66 @@ func updateIfNeeded(oldVal string, newVal string, priority bool) string {
 // init loads configuration from the environment variables and the
 // configuration file when the module is imorted.
 func init() {
-	UpdateEnv()
+	var err error
+
+	defaultLogger, err = NewLogger(configFromEnv())
+	if err != nil {
+		panic(err)
+	}
 }
 
 // getTimeFormat returns the time format we should use for time stamps in log
 // lines, or nothing if "no time logging" has been requested.
-func getTimeFormat(config rlogConfig) string {
-	settingDateTimeFormat = ""
-	logNoTime := isTrueBoolString(config.logNoTime)
-	if !logNoTime {
+func getTimeFormat(config Config) string {
+	format := ""
+	if !config.LogNoTime {
 		// Store the format string for date/time logging. Allowed values are
 		// all the constants specified in
 		// https://golang.org/src/time/format.go.
-		var f string
 		switch strings.ToUpper(config.logTimeFormat) {
 		case "ANSIC":
-			f = time.ANSIC
+			format = time.ANSIC
 		case "UNIXDATE":
-			f = time.UnixDate
+			format = time.UnixDate
 		case "RUBYDATE":
-			f = time.RubyDate
+			format = time.RubyDate
 		case "RFC822":
-			f = time.RFC822
+			format = time.RFC822
 		case "RFC822Z":
-			f = time.RFC822Z
+			format = time.RFC822Z
 		case "RFC1123":
-			f = time.RFC1123
+			format = time.RFC1123
 		case "RFC1123Z":
-			f = time.RFC1123Z
+			format = time.RFC1123Z
 		case "RFC3339":
-			f = time.RFC3339
+			format = time.RFC3339
 		case "RFC3339NANO":
-			f = time.RFC3339Nano
+			format = time.RFC3339Nano
 		case "KITCHEN":
-			f = time.Kitchen
+			format = time.Kitchen
 		default:
 			if config.logTimeFormat != "" {
-				f = config.logTimeFormat
+				format = config.logTimeFormat
 			} else {
-				f = time.RFC3339
+				format = time.RFC3339
 			}
 		}
-		settingDateTimeFormat = f + " "
 	}
-	return settingDateTimeFormat
+	return format
 }
 
-// initialize translates config items into initialized data structures,
-// config values and freshly created or opened config files, if necessary.
-// This function prepares everything for the fast and efficient processing of
-// the actual log functions.
-// Importantly, it takes the passed in configuration and combines it with any
-// configuration provided in a configuration file.
-// If the reInitEnvVars flag is set then the passed-in configuration overwrites
-// the settings stored from the environment variables, which we need for our tests.
-func initialize(config rlogConfig, reInitEnvVars bool) {
-	var err error
-
-	initMutex.Lock()
-	defer initMutex.Unlock()
-
-	if reInitEnvVars {
-		configFromEnvVars = config
+// SetOutput re-wires the log output to a new io.Writer. By default rlog
+// logs to os.Stderr, but this function can be used to direct the output
+// somewhere else. If output to two destinations was specified via environment
+// variables then this will change it back to just one output.
+func (l *logger) SetOutput(writer io.Writer) {
+	// Use the stored date/time flag settings
+	l.logWriterStream = log.New(writer, "", 0)
+	l.logWriterFile = nil
+	if l.currentLogFile != nil {
+		l.currentLogFile.Close()
+		l.currentLogFileName = ""
 	}
-
-	// Read and merge configuration from the config file
-	updateConfigFromFile(&config)
-
-	var checkTime int
-	checkTime, err = strconv.Atoi(config.confCheckInterv)
-	if err == nil {
-		settingCheckInterval = time.Duration(checkTime) * time.Second
-	} else {
-		if config.confCheckInterv != "" {
-			rlogIssue("Cannot parse config check interval value '%s'. Using default.",
-				config.confCheckInterv)
-		}
-	}
-	settingShowCallerInfo = isTrueBoolString(config.showCallerInfo)
-	settingShowGoroutineID = isTrueBoolString(config.showGoroutineID)
-
-	// initialize filters for trace (by default no trace output) and log levels
-	// (by default INFO level).
-	newTraceFilterSpec := new(filterSpec)
-	newTraceFilterSpec.fromString(config.traceLevel, true, noTraceOutput)
-	traceFilterSpec = newTraceFilterSpec
-
-	newLogFilterSpec := new(filterSpec)
-	newLogFilterSpec.fromString(config.logLevel, false, levelInfo)
-	logFilterSpec = newLogFilterSpec
-
-	// Evaluate the specified date/time format
-	settingDateTimeFormat = getTimeFormat(config)
-
-	// By default we log to stderr...
-	// Evaluating whether a different log stream should be used.
-	// By default (if flag is not set) we want to log date and time.
-	// Note that in our log writers we disable date/time loggin, since we will
-	// take care of producing this ourselves.
-	if config.logStream == "STDOUT" {
-		logWriterStream = log.New(os.Stdout, "", 0)
-	} else if config.logStream == "NONE" {
-		logWriterStream = nil
-	} else {
-		logWriterStream = log.New(os.Stderr, "", 0)
-	}
-
-	// ... but if requested we'll also create and/or append to a logfile
-	var newLogFile *os.File
-	if currentLogFileName != config.logFile { // something changed
-		if config.logFile == "" {
-			// no more log output to a file
-			logWriterFile = nil
-		} else {
-			// Check if the logfile was changed or was set for the first
-			// time. Only then do we need to open/create a new file.
-			// We also do this if for some reason we don't have a log writer
-			// yet.
-			if currentLogFileName != config.logFile || logWriterFile == nil {
-				newLogFile, err = os.OpenFile(config.logFile,
-					os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
-				if err == nil {
-					logWriterFile = log.New(newLogFile, "", 0)
-				} else {
-					rlogIssue("Unable to open log file: %s", err)
-					return
-				}
-			}
-		}
-
-		// Close the old logfile, since we are now writing to a new file
-		if currentLogFileName != "" {
-			currentLogFile.Close()
-			currentLogFileName = config.logFile
-			currentLogFile = newLogFile
-		}
-	}
-}
-
-// SetConfFile enables the programmatic setting of a new config file path.
-// Any config values specified in that file will be immediately applied.
-func SetConfFile(confFileName string) {
-	configFromEnvVars.confFile = confFileName
-	initialize(configFromEnvVars, false)
-}
-
-// UpdateEnv extracts settings for our logger from environment variables and
-// calls the actual initialization function with that configuration.
-func UpdateEnv() {
-	// Get environment-based configuration
-	config := configFromEnv()
-	// Pass the environment variable config through to the next stage, which
-	// produces an updated config based on config file values.
-	initialize(config, true)
 }
 
 // SetOutput re-wires the log output to a new io.Writer. By default rlog
@@ -418,13 +300,7 @@ func UpdateEnv() {
 // somewhere else. If output to two destinations was specified via environment
 // variables then this will change it back to just one output.
 func SetOutput(writer io.Writer) {
-	// Use the stored date/time flag settings
-	logWriterStream = log.New(writer, "", 0)
-	logWriterFile = nil
-	if currentLogFile != nil {
-		currentLogFile.Close()
-		currentLogFileName = ""
-	}
+	defaultLogger.SetOutput(writer)
 }
 
 // isTrueBoolString tests a string to see if it represents a 'true' value.
@@ -450,30 +326,124 @@ func rlogIssue(prefix string, a ...interface{}) {
 	fmt.Fprintf(os.Stderr, fmtStr, a...)
 }
 
+type logger struct {
+	logFilterSpec         *filterSpec
+	traceFilterSpec       *filterSpec
+	formatter             LogFormatter
+	additionalInformation string
+
+	settingShowCallerInfo  bool   // whether we log caller info
+	settingShowGoroutineID bool   // whether we show goroutine ID in caller info
+	settingDateTimeFormat  string // flags for date/time output
+	settingConfFile        string // config file name
+
+	settingCheckInterval time.Duration
+
+	logWriterStream     *log.Logger // the first writer to which output is sent
+	logWriterFile       *log.Logger // the second writer to which output is sent
+	lastConfigFileCheck time.Time   // when did we last check the config file
+	currentLogFile      *os.File    // the logfile currently in use
+	currentLogFileName  string      // name of current log file
+}
+
+var defaultLogger *logger
+
+func (l *logger) Formatter() LogFormatter {
+	return l.formatter
+}
+
+func NewLogger(config Config) (*logger, error) {
+	// initialize filters for trace (by default no trace output) and log levels
+	// (by default INFO level).
+	newTraceFilterSpec := new(filterSpec)
+	newTraceFilterSpec.fromString(config.TraceLevel, true, noTraceOutput)
+
+	newLogFilterSpec := new(filterSpec)
+	newLogFilterSpec.fromString(config.LogLevel, false, levelInfo)
+
+	var formatter LogFormatter
+	switch config.Formatter {
+	case "text", "":
+		formatter = &TextFormatter{}
+	default:
+		return nil, fmt.Errorf("formatter '%s' is unknown", config.Formatter)
+	}
+
+	l := &logger{
+		formatter:       formatter,
+		traceFilterSpec: newTraceFilterSpec,
+		logFilterSpec:   newLogFilterSpec,
+	}
+
+	var checkTime int
+	checkTime, err := strconv.Atoi(config.confCheckInterv)
+	if err == nil {
+		l.settingCheckInterval = time.Duration(checkTime) * time.Second
+	} else {
+		if config.confCheckInterv != "" {
+			rlogIssue("Cannot parse config check interval value '%s'. Using default.",
+				config.confCheckInterv)
+		}
+	}
+	l.settingShowCallerInfo = config.ShowCallerInfo
+	l.settingShowGoroutineID = config.ShowGoroutineID
+
+	// Evaluate the specified date/time format
+	l.settingDateTimeFormat = getTimeFormat(config)
+
+	// By default we log to stderr...
+	// Evaluating whether a different log stream should be used.
+	// By default (if flag is not set) we want to log date and time.
+	// Note that in our log writers we disable date/time loggin, since we will
+	// take care of producing this ourselves.
+	if config.LogStream == "STDOUT" {
+		l.logWriterStream = log.New(os.Stdout, "", 0)
+	} else if config.LogStream == "NONE" {
+		l.logWriterStream = nil
+	} else {
+		l.logWriterStream = log.New(os.Stderr, "", 0)
+	}
+
+	// ... but if requested we'll also create and/or append to a logfile
+	var newLogFile *os.File
+	if l.currentLogFileName != config.LogFile { // something changed
+		if config.LogFile == "" {
+			// no more log output to a file
+			l.logWriterFile = nil
+		} else {
+			// Check if the logfile was changed or was set for the first
+			// time. Only then do we need to open/create a new file.
+			// We also do this if for some reason we don't have a log writer
+			// yet.
+			if l.currentLogFileName != config.LogFile || l.logWriterFile == nil {
+				newLogFile, err = os.OpenFile(config.LogFile,
+					os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+				if err == nil {
+					l.logWriterFile = log.New(newLogFile, "", 0)
+				} else {
+					rlogIssue("Unable to open log file: %s", err)
+					return nil, err
+				}
+			}
+		}
+
+		// Close the old logfile, since we are now writing to a new file
+		if l.currentLogFileName != "" {
+			l.currentLogFile.Close()
+			l.currentLogFileName = config.LogFile
+			l.currentLogFile = newLogFile
+		}
+	}
+
+	return l, nil
+}
+
 // basicLog is called by all the 'level' log functions.
 // It checks what is configured to be included in the log message, decorates it
 // accordingly and assembles the entire line. It then uses the standard log
 // package to finally output the message.
-func basicLog(logLevel int, traceLevel int, isLocked bool, additionalInformation string, format string, prefixAddition string, a ...interface{}) {
+func (l *logger) BasicLog(logLevel int, traceLevel int, additionalInformation string, format string, prefixAddition string, a ...interface{}) {
 	now := time.Now()
-
-	// In some cases the caller already got this lock for us
-	if !isLocked {
-		initMutex.RLock()
-		defer initMutex.RUnlock()
-	}
-
-	// Check if it's time to load updated information from the config file
-	if settingCheckInterval > 0 && now.Sub(lastConfigFileCheck) > settingCheckInterval {
-		// This unlock always happens, since initMutex is locked at this point,
-		// either by this function or the caller Initialize needs to be able to
-		initMutex.RUnlock()
-		// Get the full lock, so we need to release ours.
-		initialize(configFromEnvVars, false)
-		// Take our reader lock again. This is fine, since only the check
-		// interval related items were read earlier.
-		initMutex.RLock()
-	}
 
 	// Extract information about the caller of the log function, if requested.
 	var callingFuncName string
@@ -497,11 +467,11 @@ func basicLog(logLevel int, traceLevel int, isLocked bool, additionalInformation
 	// Perform tests to see if we should log this message.
 	var allowLog bool
 	if traceLevel == notATrace {
-		if logFilterSpec.matchfilters(moduleAndFileName, logLevel) {
+		if l.logFilterSpec.matchfilters(moduleAndFileName, logLevel) {
 			allowLog = true
 		}
 	} else {
-		if traceFilterSpec.matchfilters(moduleAndFileName, traceLevel) {
+		if l.traceFilterSpec.matchfilters(moduleAndFileName, traceLevel) {
 			allowLog = true
 		}
 	}
@@ -510,8 +480,8 @@ func basicLog(logLevel int, traceLevel int, isLocked bool, additionalInformation
 	}
 
 	callerInfo := ""
-	if settingShowCallerInfo {
-		if settingShowGoroutineID {
+	if l.settingShowCallerInfo {
+		if l.settingShowGoroutineID {
 			callerInfo = fmt.Sprintf("[%d:%d %s:%d (%s)] ", os.Getpid(),
 				getGID(), moduleAndFileName, line, callingFuncName)
 		} else {
@@ -520,30 +490,52 @@ func basicLog(logLevel int, traceLevel int, isLocked bool, additionalInformation
 		}
 	}
 
+	msgCapacity := 1 + len(a)
+	if len(l.additionalInformation) > 0 {
+		msgCapacity++
+	}
+	if len(additionalInformation) > 0 {
+		msgCapacity++
+	}
+
 	// Assemble the actual log line
-	var msg string
+	msg := make([]interface{}, 0, msgCapacity)
+
+	if len(l.additionalInformation) > 0 {
+		msg = append(msg, l.additionalInformation)
+	}
+
+	if len(additionalInformation) > 0 {
+		if len(l.additionalInformation) > 0 {
+			msg = append(msg, l.formatter.Separator())
+		}
+		msg = append(msg, additionalInformation, l.formatter.Separator())
+	}
+
 	if format != "" {
-		if len(additionalInformation) > 0 {
-			msg = fmt.Sprintln(additionalInformation, fmt.Sprintf(format, a...))
-		} else {
-			msg = fmt.Sprintln(fmt.Sprintf(format, a...))
-		}
+		msg = append(msg, l.formatter.Format("msg", fmt.Sprintf(format, a...)))
 	} else {
-		if len(additionalInformation) > 0 {
-			msg = fmt.Sprintln(additionalInformation, fmt.Sprint(a...))
-		} else {
-			msg = fmt.Sprint(a...)
-		}
+		msg = append(msg, l.formatter.Format("msg", fmt.Sprint(a...)))
 	}
 	levelDecoration := levelStrings[logLevel] + prefixAddition
-	logLine := fmt.Sprintf("%s%-9s: %s%s",
-		now.Format(settingDateTimeFormat), levelDecoration, callerInfo, msg)
-	if logWriterStream != nil {
-		logWriterStream.Print(logLine)
+
+	logLine := l.Formatter().Line(now.Format(l.settingDateTimeFormat), levelDecoration, callerInfo, fmt.Sprint(msg...))
+	if l.logWriterStream != nil {
+		l.logWriterStream.Print(logLine)
 	}
-	if logWriterFile != nil {
-		logWriterFile.Print(logLine)
+	if l.logWriterFile != nil {
+		l.logWriterFile.Print(logLine)
 	}
+}
+
+func (l *logger) WithField(name string, value interface{}) Logger {
+	return newSubLogger(l, Fields{
+		name: value,
+	})
+}
+
+func (l *logger) WithFields(fields Fields) Logger {
+	return newSubLogger(l, fields)
 }
 
 // getGID gets the current goroutine ID (algorithm from
@@ -563,14 +555,104 @@ func getGID() uint64 {
 // of trace message are output: Every message with a level lower or equal to
 // what is specified in RLOG_TRACE_LEVEL. If RLOG_TRACE_LEVEL is not defined at
 // all then no trace messages are printed.
+func (l *logger) Trace(traceLevel int, a ...interface{}) {
+	// There are possibly many trace messages. If trace logging isn't enabled
+	// then we want to get out of here as quickly as possible.
+	if len(l.traceFilterSpec.filters) > 0 {
+		prefixAddition := fmt.Sprintf("(%d)", traceLevel)
+		l.BasicLog(levelTrace, traceLevel, "", "", prefixAddition, a...)
+	}
+}
+
+// Tracef prints trace messages, with formatting.
+func (l *logger) Tracef(traceLevel int, format string, a ...interface{}) {
+	// There are possibly many trace messages. If trace logging isn't enabled
+	// then we want to get out of here as quickly as possible.
+	if len(l.traceFilterSpec.filters) > 0 {
+		prefixAddition := fmt.Sprintf("(%d)", traceLevel)
+		l.BasicLog(levelTrace, traceLevel, "", format, prefixAddition, a...)
+	}
+}
+
+// Debug prints a message if RLOG_LEVEL is set to DEBUG.
+func (l *logger) Debug(a ...interface{}) {
+	l.BasicLog(levelDebug, notATrace, "", "", "", a...)
+}
+
+// Debugf prints a message if RLOG_LEVEL is set to DEBUG, with formatting.
+func (l *logger) Debugf(format string, a ...interface{}) {
+	l.BasicLog(levelDebug, notATrace, "", format, "", a...)
+}
+
+// Info prints a message if RLOG_LEVEL is set to INFO or lower.
+func (l *logger) Info(a ...interface{}) {
+	l.BasicLog(levelInfo, notATrace, "", "", "", a...)
+}
+
+// Infof prints a message if RLOG_LEVEL is set to INFO or lower, with
+// formatting.
+func (l *logger) Infof(format string, a ...interface{}) {
+	l.BasicLog(levelInfo, notATrace, "", format, "", a...)
+}
+
+// Println prints a message if RLOG_LEVEL is set to INFO or lower.
+// Println shouldn't be used except for backward compatibility
+// with standard log package, directly using Info is preferred way.
+func (l *logger) Println(a ...interface{}) {
+	l.BasicLog(levelInfo, notATrace, "", "", "", a...)
+}
+
+// Printf prints a message if RLOG_LEVEL is set to INFO or lower, with
+// formatting.
+// Printf shouldn't be used except for backward compatibility
+// with standard log package, directly using Infof is preferred way.
+func (l *logger) Printf(format string, a ...interface{}) {
+	l.BasicLog(levelInfo, notATrace, "", format, "", a...)
+}
+
+// Warn prints a message if RLOG_LEVEL is set to WARN or lower.
+func (l *logger) Warn(a ...interface{}) {
+	l.BasicLog(levelWarn, notATrace, "", "", "", a...)
+}
+
+// Warnf prints a message if RLOG_LEVEL is set to WARN or lower, with
+// formatting.
+func (l *logger) Warnf(format string, a ...interface{}) {
+	l.BasicLog(levelWarn, notATrace, "", format, "", a...)
+}
+
+// Error prints a message if RLOG_LEVEL is set to ERROR or lower.
+func (l *logger) Error(a ...interface{}) {
+	l.BasicLog(levelErr, notATrace, "", "", "", a...)
+}
+
+// Errorf prints a message if RLOG_LEVEL is set to ERROR or lower, with
+// formatting.
+func (l *logger) Errorf(format string, a ...interface{}) {
+	l.BasicLog(levelErr, notATrace, "", format, "", a...)
+}
+
+// Critical prints a message if RLOG_LEVEL is set to CRITICAL or lower.
+func (l *logger) Critical(a ...interface{}) {
+	l.BasicLog(levelCrit, notATrace, "", "", "", a...)
+}
+
+// Criticalf prints a message if RLOG_LEVEL is set to CRITICAL or lower, with
+// formatting.
+func (l *logger) Criticalf(format string, a ...interface{}) {
+	l.BasicLog(levelCrit, notATrace, "", format, "", a...)
+}
+
+func (l *logger) updateConfig(env Config) {
+	//
+}
+
 func Trace(traceLevel int, a ...interface{}) {
 	// There are possibly many trace messages. If trace logging isn't enabled
 	// then we want to get out of here as quickly as possible.
-	initMutex.RLock()
-	defer initMutex.RUnlock()
-	if len(traceFilterSpec.filters) > 0 {
+	if len(defaultLogger.traceFilterSpec.filters) > 0 {
 		prefixAddition := fmt.Sprintf("(%d)", traceLevel)
-		basicLog(levelTrace, traceLevel, true, "", "", prefixAddition, a...)
+		defaultLogger.BasicLog(levelTrace, traceLevel, "", "", prefixAddition, a...)
 	}
 }
 
@@ -578,40 +660,38 @@ func Trace(traceLevel int, a ...interface{}) {
 func Tracef(traceLevel int, format string, a ...interface{}) {
 	// There are possibly many trace messages. If trace logging isn't enabled
 	// then we want to get out of here as quickly as possible.
-	initMutex.RLock()
-	defer initMutex.RUnlock()
-	if len(traceFilterSpec.filters) > 0 {
+	if len(defaultLogger.traceFilterSpec.filters) > 0 {
 		prefixAddition := fmt.Sprintf("(%d)", traceLevel)
-		basicLog(levelTrace, traceLevel, true, "", format, prefixAddition, a...)
+		defaultLogger.BasicLog(levelTrace, traceLevel, "", format, prefixAddition, a...)
 	}
 }
 
 // Debug prints a message if RLOG_LEVEL is set to DEBUG.
 func Debug(a ...interface{}) {
-	basicLog(levelDebug, notATrace, false, "", "", "", a...)
+	defaultLogger.BasicLog(levelDebug, notATrace, "", "", "", a...)
 }
 
 // Debugf prints a message if RLOG_LEVEL is set to DEBUG, with formatting.
 func Debugf(format string, a ...interface{}) {
-	basicLog(levelDebug, notATrace, false, "", format, "", a...)
+	defaultLogger.BasicLog(levelDebug, notATrace, "", format, "", a...)
 }
 
 // Info prints a message if RLOG_LEVEL is set to INFO or lower.
 func Info(a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, "", "", "", a...)
+	defaultLogger.BasicLog(levelInfo, notATrace, "", "", "", a...)
 }
 
 // Infof prints a message if RLOG_LEVEL is set to INFO or lower, with
 // formatting.
 func Infof(format string, a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, "", format, "", a...)
+	defaultLogger.BasicLog(levelInfo, notATrace, "", "", "", fmt.Sprintf(format, a...))
 }
 
 // Println prints a message if RLOG_LEVEL is set to INFO or lower.
 // Println shouldn't be used except for backward compatibility
 // with standard log package, directly using Info is preferred way.
 func Println(a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, "", "", "", a...)
+	defaultLogger.BasicLog(levelInfo, notATrace, "", "", "", a...)
 }
 
 // Printf prints a message if RLOG_LEVEL is set to INFO or lower, with
@@ -619,38 +699,38 @@ func Println(a ...interface{}) {
 // Printf shouldn't be used except for backward compatibility
 // with standard log package, directly using Infof is preferred way.
 func Printf(format string, a ...interface{}) {
-	basicLog(levelInfo, notATrace, false, "", format, "", a...)
+	defaultLogger.BasicLog(levelInfo, notATrace, "", format, "", a...)
 }
 
 // Warn prints a message if RLOG_LEVEL is set to WARN or lower.
 func Warn(a ...interface{}) {
-	basicLog(levelWarn, notATrace, false, "", "", "", a...)
+	defaultLogger.BasicLog(levelWarn, notATrace, "", "", "", a...)
 }
 
 // Warnf prints a message if RLOG_LEVEL is set to WARN or lower, with
 // formatting.
 func Warnf(format string, a ...interface{}) {
-	basicLog(levelWarn, notATrace, false, "", format, "", a...)
+	defaultLogger.BasicLog(levelWarn, notATrace, "", format, "", a...)
 }
 
 // Error prints a message if RLOG_LEVEL is set to ERROR or lower.
 func Error(a ...interface{}) {
-	basicLog(levelErr, notATrace, false, "", "", "", a...)
+	defaultLogger.BasicLog(levelErr, notATrace, "", "", "", a...)
 }
 
 // Errorf prints a message if RLOG_LEVEL is set to ERROR or lower, with
 // formatting.
 func Errorf(format string, a ...interface{}) {
-	basicLog(levelErr, notATrace, false, "", format, "", a...)
+	defaultLogger.BasicLog(levelErr, notATrace, "", format, "", a...)
 }
 
 // Critical prints a message if RLOG_LEVEL is set to CRITICAL or lower.
 func Critical(a ...interface{}) {
-	basicLog(levelCrit, notATrace, false, "", "", "", a...)
+	defaultLogger.BasicLog(levelCrit, notATrace, "", "", "", a...)
 }
 
 // Criticalf prints a message if RLOG_LEVEL is set to CRITICAL or lower, with
 // formatting.
 func Criticalf(format string, a ...interface{}) {
-	basicLog(levelCrit, notATrace, false, "", format, "", a...)
+	defaultLogger.BasicLog(levelCrit, notATrace, "", format, "", a...)
 }

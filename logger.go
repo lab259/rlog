@@ -8,6 +8,8 @@ type Fields map[string]interface{}
 type Logger interface {
 	WithField(name string, value interface{}) Logger
 	WithFields(fields Fields) Logger
+	Formatter() LogFormatter
+	BasicLog(logLevel int, traceLevel int, additionalInformation string, format string, prefixAddition string, a ...interface{})
 	Trace(level int, a ...interface{})
 	Tracef(level int, format string, a ...interface{})
 	Debug(a ...interface{})
@@ -24,18 +26,42 @@ type Logger interface {
 	Criticalf(format string, a ...interface{})
 }
 
-// The logger is a cheap struct that adds the ContextInfo right after the
-// logging messages for all logging scopes.
-type loggerImpl struct {
+// subLogger is a cheap struct that works on top of a `Logger` for aggregation
+// additional information to the entries triggered by it.
+type subLogger struct {
+	logger                Logger
 	additionalInformation string
 }
 
-// NewLogger creates a new instance of `Logger` the `ContextInfo` member
-// initialized.
-func NewLogger() *loggerImpl {
-	return &loggerImpl{
-		additionalInformation: "",
+func newSubLogger(logger Logger, fields Fields) *subLogger {
+	return &subLogger{
+		logger:                logger,
+		additionalInformation: logger.Formatter().FormatFields(fields),
 	}
+}
+
+func (logger *subLogger) WithField(name string, value interface{}) Logger {
+	return newSubLogger(logger, Fields{
+		name: value,
+	})
+}
+
+func (logger *subLogger) WithFields(fields Fields) Logger {
+	return newSubLogger(logger, fields)
+}
+
+func (logger *subLogger) Formatter() LogFormatter {
+	return logger.logger.Formatter()
+}
+
+func (logger *subLogger) BasicLog(logLevel int, traceLevel int, additionalInformation string, format string, prefixAddition string, a ...interface{}) {
+	ai := logger.additionalInformation
+	if len(ai) > 0 && len(additionalInformation) > 0 {
+		ai = fmt.Sprint(ai, logger.Formatter().Separator(), additionalInformation)
+	} else {
+		ai = additionalInformation
+	}
+	logger.logger.BasicLog(logLevel, traceLevel, ai, format, prefixAddition, a...)
 }
 
 // Trace is for low level tracing of activities. It takes an additional 'level'
@@ -43,82 +69,70 @@ func NewLogger() *loggerImpl {
 // of trace message are output: Every message with a level lower or equal to
 // what is specified in RLOG_TRACE_LEVEL. If RLOG_TRACE_LEVEL is not defined at
 // all then no trace messages are printed.
-func (logger *loggerImpl) Trace(traceLevel int, a ...interface{}) {
-	// There are possibly many trace messages. If trace logging isn't enabled
-	// then we want to get out of here as quickly as possible.
-	initMutex.RLock()
-	defer initMutex.RUnlock()
-	if len(traceFilterSpec.filters) > 0 {
-		prefixAddition := fmt.Sprintf("(%d)", traceLevel)
-		if logger != nil {
-			basicLog(levelTrace, traceLevel, true, logger.additionalInformation, "", prefixAddition, a...)
-		} else {
-			basicLog(levelTrace, traceLevel, true, "", "", prefixAddition, a...)
-		}
+func (logger *subLogger) Trace(traceLevel int, a ...interface{}) {
+	prefixAddition := fmt.Sprintf("(%d)", traceLevel)
+	if logger != nil {
+		logger.logger.BasicLog(levelTrace, traceLevel, logger.additionalInformation, "", prefixAddition, a...)
+	} else {
+		logger.logger.BasicLog(levelTrace, traceLevel, "", "", prefixAddition, a...)
 	}
 }
 
 // Tracef prints trace messages, with formatting.
-func (logger *loggerImpl) Tracef(traceLevel int, format string, a ...interface{}) {
-	// There are possibly many trace messages. If trace logging isn't enabled
-	// then we want to get out of here as quickly as possible.
-	initMutex.RLock()
-	defer initMutex.RUnlock()
-	if len(traceFilterSpec.filters) > 0 {
-		prefixAddition := fmt.Sprintf("(%d)", traceLevel)
-		if logger != nil {
-			basicLog(levelTrace, traceLevel, true, logger.additionalInformation, format, prefixAddition, a...)
-		} else {
-			basicLog(levelTrace, traceLevel, true, "", format, prefixAddition, a...)
-		}
+func (logger *subLogger) Tracef(traceLevel int, format string, a ...interface{}) {
+	prefixAddition := fmt.Sprintf("(%d)", traceLevel)
+	if logger != nil {
+		logger.logger.BasicLog(levelTrace, traceLevel, logger.additionalInformation, format, prefixAddition, a...)
+	} else {
+		logger.logger.BasicLog(levelTrace, traceLevel, "", format, prefixAddition, a...)
 	}
 }
 
 // Debug prints a message if RLOG_LEVEL is set to DEBUG.
-func (logger *loggerImpl) Debug(a ...interface{}) {
+func (logger *subLogger) Debug(a ...interface{}) {
 	if logger != nil {
-		basicLog(levelDebug, notATrace, false, logger.additionalInformation, "", "", a...)
+		logger.logger.BasicLog(levelDebug, notATrace, logger.additionalInformation, "", "", a...)
 	} else {
-		basicLog(levelDebug, notATrace, false, "", "", "", a...)
+		logger.logger.BasicLog(levelDebug, notATrace, "", "", "", a...)
 	}
 }
 
 // Debugf prints a message if RLOG_LEVEL is set to DEBUG, with formatting.
-func (logger *loggerImpl) Debugf(format string, a ...interface{}) {
+func (logger *subLogger) Debugf(format string, a ...interface{}) {
 	if logger != nil {
-		basicLog(levelDebug, notATrace, false, logger.additionalInformation, format, "", a...)
+		logger.logger.BasicLog(levelDebug, notATrace, logger.additionalInformation, format, "", a...)
 	} else {
-		basicLog(levelDebug, notATrace, false, "", format, "", a...)
+		logger.logger.BasicLog(levelDebug, notATrace, "", format, "", a...)
 	}
 }
 
 // Info prints a message if RLOG_LEVEL is set to INFO or lower.
-func (logger *loggerImpl) Info(a ...interface{}) {
+func (logger *subLogger) Info(a ...interface{}) {
 	if logger != nil {
-		basicLog(levelInfo, notATrace, false, logger.additionalInformation, "", "", a...)
+		logger.logger.BasicLog(levelInfo, notATrace, logger.additionalInformation, "", "", a...)
 	} else {
-		basicLog(levelInfo, notATrace, false, "", "", "", a...)
+		logger.logger.BasicLog(levelInfo, notATrace, "", "", "", a...)
 	}
 }
 
 // Infof prints a message if RLOG_LEVEL is set to INFO or lower, with
 // formatting.
-func (logger *loggerImpl) Infof(format string, a ...interface{}) {
+func (logger *subLogger) Infof(format string, a ...interface{}) {
 	if logger != nil {
-		basicLog(levelInfo, notATrace, false, logger.additionalInformation, format, "", a...)
+		logger.logger.BasicLog(levelInfo, notATrace, logger.additionalInformation, format, "", a...)
 	} else {
-		basicLog(levelInfo, notATrace, false, "", format, "", a...)
+		logger.logger.BasicLog(levelInfo, notATrace, "", format, "", a...)
 	}
 }
 
 // Println prints a message if RLOG_LEVEL is set to INFO or lower.
 // Println shouldn't be used except for backward compatibility
 // with standard log package, directly using Info is preferred way.
-func (logger *loggerImpl) Println(a ...interface{}) {
+func (logger *subLogger) Println(a ...interface{}) {
 	if logger != nil {
-		basicLog(levelInfo, notATrace, false, logger.additionalInformation, "", "", a...)
+		logger.logger.BasicLog(levelInfo, notATrace, logger.additionalInformation, "", "", a...)
 	} else {
-		basicLog(levelInfo, notATrace, false, "", "", "", a...)
+		logger.logger.BasicLog(levelInfo, notATrace, "", "", "", a...)
 	}
 }
 
@@ -126,67 +140,67 @@ func (logger *loggerImpl) Println(a ...interface{}) {
 // formatting.
 // Printf shouldn't be used except for backward compatibility
 // with standard log package, directly using Infof is preferred way.
-func (logger *loggerImpl) Printf(format string, a ...interface{}) {
+func (logger *subLogger) Printf(format string, a ...interface{}) {
 	if logger != nil {
-		basicLog(levelInfo, notATrace, false, logger.additionalInformation, format, "", a...)
+		logger.logger.BasicLog(levelInfo, notATrace, logger.additionalInformation, format, "", a...)
 	} else {
-		basicLog(levelInfo, notATrace, false, "", format, "", a...)
+		logger.logger.BasicLog(levelInfo, notATrace, "", format, "", a...)
 	}
 }
 
 // Warn prints a message if RLOG_LEVEL is set to WARN or lower.
-func (logger *loggerImpl) Warn(a ...interface{}) {
+func (logger *subLogger) Warn(a ...interface{}) {
 	if logger != nil {
-		basicLog(levelWarn, notATrace, false, logger.additionalInformation, "", "", a...)
+		logger.logger.BasicLog(levelWarn, notATrace, logger.additionalInformation, "", "", a...)
 	} else {
-		basicLog(levelWarn, notATrace, false, "", "", "", a...)
+		logger.logger.BasicLog(levelWarn, notATrace, "", "", "", a...)
 	}
 }
 
 // Warnf prints a message if RLOG_LEVEL is set to WARN or lower, with
 // formatting.
-func (logger *loggerImpl) Warnf(format string, a ...interface{}) {
+func (logger *subLogger) Warnf(format string, a ...interface{}) {
 	if logger != nil {
-		basicLog(levelWarn, notATrace, false, logger.additionalInformation, format, "", a...)
+		logger.logger.BasicLog(levelWarn, notATrace, logger.additionalInformation, format, "", a...)
 	} else {
-		basicLog(levelWarn, notATrace, false, "", format, "", a...)
+		logger.logger.BasicLog(levelWarn, notATrace, "", format, "", a...)
 	}
 }
 
 // Error prints a message if RLOG_LEVEL is set to ERROR or lower.
-func (logger *loggerImpl) Error(a ...interface{}) {
+func (logger *subLogger) Error(a ...interface{}) {
 	if logger != nil {
-		basicLog(levelErr, notATrace, false, logger.additionalInformation, "", "", a...)
+		logger.logger.BasicLog(levelErr, notATrace, logger.additionalInformation, "", "", a...)
 	} else {
-		basicLog(levelErr, notATrace, false, "", "", "", a...)
+		logger.logger.BasicLog(levelErr, notATrace, "", "", "", a...)
 	}
 }
 
 // Errorf prints a message if RLOG_LEVEL is set to ERROR or lower, with
 // formatting.
-func (logger *loggerImpl) Errorf(format string, a ...interface{}) {
+func (logger *subLogger) Errorf(format string, a ...interface{}) {
 	if logger != nil {
-		basicLog(levelErr, notATrace, false, logger.additionalInformation, format, "", a...)
+		logger.logger.BasicLog(levelErr, notATrace, logger.additionalInformation, format, "", a...)
 	} else {
-		basicLog(levelErr, notATrace, false, "", format, "", a...)
+		logger.logger.BasicLog(levelErr, notATrace, "", format, "", a...)
 	}
 }
 
 // Critical prints a message if RLOG_LEVEL is set to CRITICAL or lower.
-func (logger *loggerImpl) Critical(a ...interface{}) {
+func (logger *subLogger) Critical(a ...interface{}) {
 	if logger != nil {
-		basicLog(levelCrit, notATrace, false, logger.additionalInformation, "", "", a...)
+		logger.logger.BasicLog(levelCrit, notATrace, logger.additionalInformation, "", "", a...)
 	} else {
-		basicLog(levelCrit, notATrace, false, "", "", "", a...)
+		logger.logger.BasicLog(levelCrit, notATrace, "", "", "", a...)
 	}
 }
 
 // Criticalf prints a message if RLOG_LEVEL is set to CRITICAL or lower, with
 // formatting.
-func (logger *loggerImpl) Criticalf(format string, a ...interface{}) {
+func (logger *subLogger) Criticalf(format string, a ...interface{}) {
 	if logger != nil {
-		basicLog(levelCrit, notATrace, false, logger.additionalInformation, format, "", a...)
+		logger.logger.BasicLog(levelCrit, notATrace, logger.additionalInformation, format, "", a...)
 	} else {
-		basicLog(levelCrit, notATrace, false, "", format, "", a...)
+		logger.logger.BasicLog(levelCrit, notATrace, "", format, "", a...)
 	}
 }

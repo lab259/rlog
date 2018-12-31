@@ -13,6 +13,10 @@ import (
 // and translation into more easily used config items. All values therefore are
 // stored as simple strings here.
 type Config struct {
+	// Formatter will adjust the output according with the selection.
+	//
+	// For more information, please refer to the `Formatter` interface.
+	Formatter string
 	// What log level. String, since filters are allowed
 	LogLevel string
 	// What trace level. String, since filters are allowed

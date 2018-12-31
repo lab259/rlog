@@ -38,7 +38,7 @@ func main() {
 	// this value cannot be changed by modifying the environment variable.
 	rlog.Debug("You can't see this if the log level is higher than DEBUG.")
 	os.Setenv("RLOG_LOG_LEVEL", "DEBUG")
-	rlog.UpdateEnv()
+	// rlog.UpdateEnv()
 	rlog.Debug("You can see this message, because we changed level to DEBUG.")
 
 	// Example of selective trace logging

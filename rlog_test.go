@@ -17,14 +17,30 @@ package rlog
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"github.com/jamillosantos/macchiato"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
+	"log"
 	"os"
-	"path"
-	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestRLog(t *testing.T) {
+	log.SetOutput(GinkgoWriter)
+	if os.Getenv("ENV") == "" {
+		err := os.Setenv("ENV", "test")
+		if err != nil {
+			panic(err)
+		}
+	}
+	RegisterFailHandler(Fail)
+	macchiato.RunSpecs(t, "RLog Test Suite")
+}
 
 var logfile string
 
@@ -37,7 +53,7 @@ var fixedLogfileName = false
 // setup is called at the start of each test and prepares a new log file. It
 // also returns a new configuration, as it may have been supplied by the user
 // in environment variables, which can be used by this test.
-func setup() rlogConfig {
+func setup() Config {
 	if fixedLogfileName {
 		logfile = "/tmp/rlog-test.log"
 	} else {
@@ -49,15 +65,15 @@ func setup() rlogConfig {
 	os.Remove(logfile)
 
 	// Provide a default config, which can be used or modified by the tests
-	return rlogConfig{
-		logLevel:       "",
-		traceLevel:     "",
+	return Config{
+		LogLevel:       "",
+		TraceLevel:     "",
 		logTimeFormat:  "",
 		confFile:       "",
-		logFile:        logfile,
-		logStream:      "NONE",
-		logNoTime:      "true",
-		showCallerInfo: "false",
+		LogFile:        logfile,
+		LogStream:      "NONE",
+		LogNoTime:      true,
+		ShowCallerInfo: false,
 	}
 }
 
@@ -66,6 +82,22 @@ func cleanup() {
 	if removeLogfile {
 		os.Remove(logfile)
 	}
+}
+
+// OverrideEnv stores the current state of the environment variables, sets the
+// new values according with the passed params, calls the callback and finally
+// restores the previous state.
+func OverrideEnv(vars map[string]string, callback func() error) error {
+	current := make(map[string]string)
+	for k, v := range vars {
+		current[k] = os.Getenv(k)
+		os.Setenv(k, v)
+	}
+	err := callback()
+	for k, v := range current {
+		os.Setenv(k, v)
+	}
+	return err
 }
 
 // fileMatch compares entries in the logfile with expected entries provided as
@@ -125,196 +157,242 @@ func fileMatch(t *testing.T, checkLines []string, timeLayout string) {
 
 // ---------- Tests -----------
 
-// TestLogLevels performs some basic tests for each known log level.
-func TestLogLevels(t *testing.T) {
-	conf := setup()
-	defer cleanup()
+var _ = Describe("RLog Test Suite", func() {
 
-	conf.logLevel = "DEBUG"
-	initialize(conf, true) // re-initialize the environment variable config
+	BeforeEach(func() {
+		setup()
+	})
 
-	Debug("Test Debug")
-	Info("Test Info")
-	Warn("Test Warning")
-	Error("Test Error")
-	Critical("Test Critical")
+	AfterEach(func() {
+		cleanup()
+	})
 
-	checkLines := []string{
-		"DEBUG    : Test Debug",
-		"INFO     : Test Info",
-		"WARN     : Test Warning",
-		"ERROR    : Test Error",
-		"CRITICAL : Test Critical",
-	}
-	fileMatch(t, checkLines, "")
-}
+	Describe("Levels", func() {
+		It("should place a INFO with date", func() {
+			logger, err := NewLogger(Config{})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Critical("this is a CRITICAL")
+			Expect(strings.TrimSpace(buff.String())).To(HavePrefix(`date="`))
+			Expect(strings.TrimSpace(buff.String())).To(HaveSuffix(`level="CRITICAL" msg="this is a CRITICAL"`))
+		})
 
-// TestLogLevelsLimited checks that we can limit the output of log and trace
-// messages that don't meed the minimum configured logging levels.
-func TestLogLevelsLimited(t *testing.T) {
-	conf := setup()
-	defer cleanup()
+		It("should place a CRITICAL line", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Critical("this is a CRITICAL")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="CRITICAL" msg="this is a CRITICAL"`))
+		})
 
-	conf.logLevel = "WARN"
-	conf.traceLevel = "3"
-	initialize(conf, true)
+		It("should place a CRITICAL line with format", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Criticalf("this is a CRITICAL with format %s", "enabled")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="CRITICAL" msg="this is a CRITICAL with format enabled"`))
+		})
 
-	Debug("Test Debug")
-	Info("Test Info")
-	Warn("Test Warning")
-	Error("Test Error")
-	Critical("Test Critical")
-	Trace(1, "Trace 1")
-	Trace(2, "Trace 2")
-	Trace(3, "Trace 3")
-	Trace(4, "Trace 4")
-	checkLines := []string{
-		"WARN     : Test Warning",
-		"ERROR    : Test Error",
-		"CRITICAL : Test Critical",
-		"TRACE(1) : Trace 1",
-		"TRACE(2) : Trace 2",
-		"TRACE(3) : Trace 3",
-	}
-	fileMatch(t, checkLines, "")
-}
+		It("should ingore CRITICAL when level is NONE", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+				LogLevel:  "NONE",
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Critical("this is a CRITICAL")
+			Expect(strings.TrimSpace(buff.String())).To(BeEmpty())
+		})
 
-// TestLogFormatted checks whether the *f functions for formatted output work
-// as expected.
-func TestLogFormatted(t *testing.T) {
-	conf := setup()
-	defer cleanup()
+		It("should place a ERROR line", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Error("this is a ERROR")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="ERROR" msg="this is a ERROR"`))
+		})
 
-	conf.logLevel = "DEBUG"
-	conf.traceLevel = "1"
-	initialize(conf, true)
+		It("should place a ERROR line with format", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Errorf("this is a ERROR with format %s", "enabled")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="ERROR" msg="this is a ERROR with format enabled"`))
+		})
 
-	Debugf("Test Debug %d", 123)
-	Infof("Test Info %d", 123)
-	Warnf("Test Warning %d", 123)
-	Errorf("Test Error %d", 123)
-	Criticalf("Test Critical %d", 123)
-	Tracef(1, "Trace 1 %d", 123)
-	Tracef(2, "Trace 2 %d", 123)
-	checkLines := []string{
-		"DEBUG    : Test Debug 123",
-		"INFO     : Test Info 123",
-		"WARN     : Test Warning 123",
-		"ERROR    : Test Error 123",
-		"CRITICAL : Test Critical 123",
-		"TRACE(1) : Trace 1 123",
-	}
-	fileMatch(t, checkLines, "")
-}
+		It("should ingore ERROR when level is CRITICAL", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+				LogLevel:  "CRITICAL",
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Error("this is a ERROR")
+			Expect(strings.TrimSpace(buff.String())).To(BeEmpty())
+		})
 
-// TestLogTimestamp checks that the time stamp format can be changed and that
-// we indeed get a properly formatted timestamp output.
-func TestLogTimestamp(t *testing.T) {
-	conf := setup()
-	conf.logNoTime = "false"
-	defer cleanup()
+		It("should place a WARN line", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Warn("this is a WARN")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="WARN" msg="this is a WARN"`))
+		})
 
-	checkLines := []string{
-		"INFO     : Test Info",
-	}
+		It("should place a WARN line with format", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Warnf("this is a WARN with format %s", "enabled")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="WARN" msg="this is a WARN with format enabled"`))
+		})
 
-	// Map of various 'user specified' time layouts and the actual time layout
-	// to which they should be mapped. Some of the capitalization in the well
-	// known time stamps is off, to show that those names can be specified in a
-	// case insensitive manner.
-	checkTimeStamps := map[string]string{
-		"ansIC":    time.ANSIC,
-		"UNIXDATE": time.UnixDate,
-		"rubydate": time.RubyDate,
-		"rfc822":   time.RFC822,
-		"rfc822z":  time.RFC822Z,
-		"rfc1123":  time.RFC1123,
-		"rfc1123z": time.RFC1123Z,
-		"RFC3339":  time.RFC3339,
-		//"RFC3339Nano": time.RFC3339Nano,  // Not included in the tests, since
-		// output length can vary depending on whether there are trailing zeros.
-		// Not worth the trouble.
-		"Kitchen": time.Kitchen,
-		"":        time.RFC3339, // If nothing specified, default is RFC3339
-		"2006/01/02 15:04:05": "2006/01/02 15:04:05", // custom format
-	}
+		It("should ingore WARN when level is CRITICAL", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+				LogLevel:  "WARN",
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Warn("this is a WARN")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="WARN" msg="this is a WARN"`))
+		})
 
-	for tsUserSpecified, tsActualFormat := range checkTimeStamps {
-		os.Remove(logfile)
+		It("should place a INFO line", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Info("this is a INFO")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="INFO" msg="this is a INFO"`))
+		})
 
-		// Specify a time layout...
-		conf.logTimeFormat = tsUserSpecified
-		initialize(conf, true)
+		It("should place a INFO line with format", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Infof("this is a INFO with format %s", "enabled")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="INFO" msg="this is a INFO with format enabled"`))
+		})
 
-		Info("Test Info")
-		// We can specify a time layout to fileMatch, which then performs the extra
-		// check for the correctly formatted time stamp.
-		fileMatch(t, checkLines, tsActualFormat)
-	}
-}
+		It("should ingore INFO when level is WARN", func() {
+			logger, err := NewLogger(Config{
+				LogNoTime: true,
+				LogLevel:  "WARN",
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Info("this is a INFO")
+			Expect(strings.TrimSpace(buff.String())).To(BeEmpty())
+		})
 
-// TestLogCallerInfo manually figures out the caller info, which should be
-// displayed by rlog. The code that's creating the expected caller info
-// within the test is pretty much exactly the code that should be at work
-// within rlog.
-func TestLogCallerInfo(t *testing.T) {
-	conf := setup()
-	defer cleanup()
+		It("should place a DEBUG line", func() {
+			logger, err := NewLogger(Config{
+				LogLevel:  "DEBUG",
+				LogNoTime: true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Debug("this is a DEBUG")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="DEBUG" msg="this is a DEBUG"`))
+		})
 
-	conf.showCallerInfo = "true"
-	initialize(conf, true)
+		It("should place a DEBUG line with format", func() {
+			logger, err := NewLogger(Config{
+				LogLevel:  "DEBUG",
+				LogNoTime: true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Debugf("this is a DEBUG with format %s", "enabled")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="DEBUG" msg="this is a DEBUG with format enabled"`))
+		})
 
-	Info("Test Info")
-	pc, fullFilePath, line, _ := runtime.Caller(0)
-	line-- // The log was called in the line before, so... -1
+		It("should ingore DEBUG when level is INFO", func() {
+			logger, err := NewLogger(Config{
+				LogLevel:  "INFO",
+				LogNoTime: true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Debug("this is a DEBUG")
+			Expect(strings.TrimSpace(buff.String())).To(BeEmpty())
+		})
 
-	// The following lines simply format the caller info in the way that it
-	// should be formatted by rlog
-	callingFuncName := runtime.FuncForPC(pc).Name()
-	dirPath, fileName := path.Split(fullFilePath)
-	var moduleName string
-	if dirPath != "" {
-		dirPath = dirPath[:len(dirPath)-1]
-		_, moduleName = path.Split(dirPath)
-	}
-	moduleAndFileName := moduleName + "/" + fileName
+		It("should place a TRACE line", func() {
+			logger, err := NewLogger(Config{
+				LogLevel:   "DEBUG",
+				TraceLevel: "10",
+				LogNoTime:  true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Trace(1, "this is a TRACE")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="TRACE(1)" msg="this is a TRACE"`))
+		})
 
-	shouldLine := fmt.Sprintf("INFO     : [%d %s:%d (%s)] Test Info",
-		os.Getpid(), moduleAndFileName, line, callingFuncName)
+		It("should place a TRACE line with format", func() {
+			logger, err := NewLogger(Config{
+				LogLevel:   "DEBUG",
+				TraceLevel: "10",
+				LogNoTime:  true,
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Tracef(1, "this is a TRACE with format %s", "enabled")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="TRACE(1)" msg="this is a TRACE with format enabled"`))
+		})
 
-	checkLines := []string{shouldLine}
-	fileMatch(t, checkLines, "")
-}
-
-// TestLogLevelsFiltered checks whether the per-module filtering works
-// correctly. For that, we provide a log-level filter that names this
-// executable here, so that log messages should be displayed, and a trace level
-// filter for a non-existent module, so that trace messages should not be
-// displayed.
-func TestLogLevelsFiltered(t *testing.T) {
-	conf := setup()
-	defer cleanup()
-
-	conf.logLevel = "rlog_test.go=WARN"
-	conf.traceLevel = "foobar.go=2" // should not see any of those
-	initialize(conf, true)
-
-	Debug("Test Debug")
-	Info("Test Info")
-	Warn("Test Warning")
-	Error("Test Error")
-	Critical("Test Critical")
-	Trace(1, "Trace 1")
-	Trace(2, "Trace 2")
-	Trace(3, "Trace 3")
-	Trace(4, "Trace 4")
-	checkLines := []string{
-		"WARN     : Test Warning",
-		"ERROR    : Test Error",
-		"CRITICAL : Test Critical",
-	}
-	fileMatch(t, checkLines, "")
-}
+		It("should ingore TRACE when trace level is greater than the set", func() {
+			logger, err := NewLogger(Config{
+				LogLevel:   "DEBUG",
+				LogNoTime:  true,
+				TraceLevel: "10",
+			})
+			buff := bytes.NewBuffer(nil)
+			logger.SetOutput(buff)
+			Expect(err).ToNot(HaveOccurred())
+			logger.Trace(9, "this is a TRACE(9)")
+			logger.Trace(10, "this is a TRACE(10)")
+			logger.Trace(11, "this is a TRACE(11)")
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="TRACE(9)" msg="this is a TRACE(9)"
+level="TRACE(10)" msg="this is a TRACE(10)"`))
+		})
+	})
+})
 
 // writeLogfile is a small utility function for the creation of unique config
 // files for these tests.
@@ -330,57 +408,11 @@ func writeLogfile(lines []string) string {
 
 // checkLogFilter simplifies the checking of correct log levels in the tests.
 func checkLogFilter(t *testing.T, shouldPattern string, shouldLevel int) {
-	f := logFilterSpec.filters[0]
+	f := defaultLogger.logFilterSpec.filters[0]
 	if f.Pattern != shouldPattern || f.Level != shouldLevel {
 		t.Fatalf("Incorrect default filter '%s' / %d. Should be: '%s' / %d",
 			f.Pattern, f.Level, shouldPattern, shouldLevel)
 	}
-}
-
-// TestConfFile tests the reading of an rlog config file and the proper
-// processing of settings from a config file.
-func TestConfFile(t *testing.T) {
-	conf := setup()
-	defer cleanup()
-
-	// Set the default configuration and check how this is reflected in the
-	// internal settings variables.
-	initialize(conf, true)
-
-	checkLogFilter(t, "", levelInfo)
-	t.Log("trace filter = ", traceFilterSpec)
-	if len(traceFilterSpec.filters) > 0 {
-		t.Fatal("Incorrect trace filters: ", traceFilterSpec.filters)
-	}
-
-	conf.confFile = writeLogfile([]string{"RLOG_LOG_LEVEL=DEBUG"})
-	defer os.Remove(conf.confFile)
-	initialize(conf, true)
-	// No explicit log level was set in the initial, default config. Therefore,
-	// the conf file value should have overwritten that.
-	checkLogFilter(t, "", levelDebug)
-
-	// Now we test with an initial config, which contains an explicit value for
-	// the log level. The INFO value should remain.
-	conf.logLevel = "INFO"
-	initialize(conf, true)
-	checkLogFilter(t, "", levelInfo)
-
-	// Now we test the 'override' option (start the config in the conf file
-	// with a '!'). With that, the conf file takes precedence.
-	conf.confFile = writeLogfile([]string{"!RLOG_LOG_LEVEL=DEBUG"})
-	defer os.Remove(conf.confFile)
-	initialize(conf, true)
-	checkLogFilter(t, "", levelDebug)
-
-	// Test that a full filter spec can be read from logfile and also test that
-	// space trimming worked correctly.
-	conf.confFile = writeLogfile([]string{
-		"  !RLOG_LOG_LEVEL = foo.go=DEBUG   ",
-	})
-	defer os.Remove(conf.confFile)
-	initialize(conf, true)
-	checkLogFilter(t, "foo.go", levelDebug)
 }
 
 // TestRaceConditions stress tests thread safety of rlog. Useful when running
@@ -390,15 +422,15 @@ func TestRaceConditions(t *testing.T) {
 	defer cleanup()
 
 	for i := 0; i < 1000; i++ {
-		go func(conf rlogConfig, i int) {
+		go func(conf Config, i int) {
 			for j := 0; j < 100; j++ {
 				// Change behaviour and config around a little
 				if j%2 == 0 {
-					conf.showCallerInfo = "true"
+					conf.ShowCallerInfo = true
 				}
-				conf.traceLevel = strconv.Itoa(j%10 - 1) // sometimes this will be -1
-				//initialize(conf, j%3 == 0)
-				initialize(conf, false)
+				conf.TraceLevel = strconv.Itoa(j%10 - 1) // sometimes this will be -1
+				// //initialize(conf, j%3 == 0)
+				// initialize(conf, false)
 				Debug("Test Debug")
 				Info("Test Info")
 				Trace(1, "Some trace")
