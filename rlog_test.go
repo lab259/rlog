@@ -474,11 +474,21 @@ func BenchmarkWithFields(b *testing.B) {
 	})
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		// logger.Critical("this is a test")
-		// logger.Error("this is a test")
-		// logger.Warn("this is a test")
 		logger.Info("this is a test")
-		// logger.Debug("this is a test")
-		// logger.Trace(1, "this is a test")
+	}
+}
+
+func BenchmarkWithCallerInfo(b *testing.B) {
+	buff := bytes.NewBuffer(nil)
+	logger, err := NewLogger(Config{
+		ShowCallerInfo: true,
+	})
+	if err != nil {
+		panic(err)
+	}
+	logger.SetOutput(buff)
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		logger.Info("this is a test")
 	}
 }

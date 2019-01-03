@@ -580,25 +580,11 @@ func (l *logger) BasicLog(logLevel Level, traceLevel int, additionalInformation 
 		msgCapacity++
 	}
 
-	/*
-	if len(l.additionalInformation) > 0 {
-		msg = append(msg, l.additionalInformation)
-	}
-
-	if len(additionalInformation) > 0 {
-		if len(l.additionalInformation) > 0 {
-			msg = append(msg, l.formatter.Separator())
-		}
-		msg = append(msg, additionalInformation, l.formatter.Separator())
-	}
-	*/
-
 	line := l.Formatter().Format(entry)
 	if l.logWriterStream != nil {
 		func() {
 			l.mutex.Lock()
 			l.mutex.Unlock()
-			// l.logWriterStream.Write([]byte(callerInfo))
 			l.logWriterStream.Write(line)
 		}()
 	}
