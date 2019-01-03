@@ -5,8 +5,16 @@ the outside' via environment variables and/or config file and has no
 dependencies other than the standard Golang library.
 
 It is called "rlog", because it was originally written for the
-[Romana project](https://github.com/romana/romana). 
+[Romana project](https://github.com/romana/romana).
 
+This fork extends the original implementation isolating the logic of a `Logger`
+to a struct. This way, now, this fork enables you to create as many loggers as
+you need to (yeah, this is not so common).
+
+Additionally, based on the [sirupsen/logrus](https://github.com/sirupsen/logrus),
+the methods `WithField` and `WithFields` were added to provide contextualized
+"sub-loggers" that uses a "real logger". This strategy is very useful to append
+customer information in a multi-tenant logging environment, for example.   
 
 ## Features
 
@@ -163,10 +171,10 @@ The format of the config file is simple. Each setting is referred to by the
 same name as the environment variable. So, your config file may look like this:
 
     # Comment lines start with a '#'
-    RLOG_LOG_LEVEL  = WARN
-    RLOG_LOG_STREAM = stdout
-    RLOG_TIME_FORMAT= UnixDate
-    RLOG_LOG_FILE   = /var/log/myapp.log
+    RLOG_LOG_LEVEL   = WARN
+    RLOG_LOG_STREAM  = stdout
+    RLOG_TIME_FORMAT = UnixDate
+    RLOG_LOG_FILE    = /var/log/myapp.log
 
 A few notes about config file formatting:
 
@@ -286,7 +294,7 @@ trace level.
 
 ## Usage example
 
-    import "github.com/romana/rlog"
+    import "github.com/lab259/rlog"
 
     func main() {
  	   rlog.Debug("A debug message: For the developer")
@@ -379,9 +387,56 @@ With custom time stamp:
     2017-11-16T08:09:08+13:00 INFO     : About to change log output. Check /tmp/rlog-output.log...
     2017-11-16T08:09:08+13:00 INFO     : Back to stderr
 
+## Usage with SubLoggers
+
+    import (
+    	"github.com/lab259/rlog"
+    	"math/rand"
+    	"sync"
+    	"time"
+    )
+    
+    func main() {
+    	rlog.Info("Starting system")
+    	var wg sync.WaitGroup
+    	for i := 0; i < 100; i++ {
+    		wg.Add(1)
+    		go func(logger rlog.Logger) {
+    			defer wg.Done()
+    			ms := rand.Intn(50)
+    			logger.Infof("Going to sleep for %dms", ms)
+    			time.Sleep(time.Millisecond * time.Duration(ms))
+    			logger.Info("Exiting ...")
+    		}(rlog.WithFields(rlog.Fields{
+    			"i": i,
+    		}))
+    	}
+    	rlog.Info("Waiting routines ...")
+    	wg.Wait()
+    	rlog.Info("OK!")
+    }
+
+This example will start 100 goroutines with a random sleep in it. Each,
+goroutine receives a `rlog.Logger` with the `i` in its context.
+
+The output of this example looks like:
+
+    date="2019-01-03T01:03:04Z" level="INFO" msg="Starting system"
+    date="2019-01-03T01:03:04Z" level="INFO" i="3" msg="Going to sleep for 31ms"
+    date="2019-01-03T01:03:04Z" level="INFO" i="1" msg="Going to sleep for 37ms"
+    ...
+    date="2019-01-03T01:03:04Z" level="INFO" i="82" msg="Going to sleep for 23ms"
+    date="2019-01-03T01:03:04Z" level="INFO" i="89" msg="Going to sleep for 3ms"
+    rlog.Info("Waiting routines ...")
+    date="2019-01-03T01:03:04Z" level="INFO" i="60" msg="Exiting ..."
+    date="2019-01-03T01:03:04Z" level="INFO" i="86" msg="Exiting ..."
+    date="2019-01-03T01:03:04Z" level="INFO" i="69" msg="Exiting ..."
+    ...
+    date="2019-01-03T01:03:05Z" level="INFO" i="54" msg="Exiting ..."
+    date="2019-01-03T01:03:05Z" level="INFO" msg="OK!"
 
 ## Links
 
-* [Goreportcard.com](https://goreportcard.com/report/github.com/romana/rlog)
-* [Godoc.com](https://godoc.org/github.com/romana/rlog)
-* [Gocover.io](http://gocover.io/github.com/romana/rlog)
+* [Goreportcard.com](https://goreportcard.com/report/github.com/lab259/rlog)
+* [Godoc.com](https://godoc.org/github.com/lab259/rlog)
+* [Gocover.io](http://gocover.io/github.com/lab259/rlog)
