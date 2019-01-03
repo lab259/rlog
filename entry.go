@@ -1,9 +1,5 @@
 package rlog
 
-import (
-	"time"
-)
-
 type EntryCallerInfo struct {
 	PID          int
 	GID          uint64
@@ -13,7 +9,7 @@ type EntryCallerInfo struct {
 }
 
 type Entry struct {
-	Time       time.Time
+	Time       string
 	CallerInfo EntryCallerInfo
 	Level      Level
 	TraceLevel int

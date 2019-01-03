@@ -45,9 +45,9 @@ func ReleaseOutput(data []byte) {
 func (formatter *TextFormatter) Format(entry *Entry) []byte {
 	output := AcquireOutput()
 
-	if !entry.Time.IsZero() {
+	if entry.Time != "" {
 		output = append(output, textFormatterDatePrefix...)
-		output = append(output, []byte(entry.Time.String())...)
+		output = append(output, entry.Time...)
 		output = append(output, textFormatterQuoteWithSeparator...)
 	}
 	output = append(output, textFormatterLevelPrefix...)

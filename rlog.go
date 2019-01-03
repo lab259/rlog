@@ -506,9 +506,9 @@ func (l *logger) BasicLog(logLevel Level, traceLevel int, additionalInformation 
 		entry.Message = fmt.Sprint(a...)
 	}
 	if l.logNoTime {
-		entry.Time = time.Time{}
+		entry.Time = ""
 	} else {
-		entry.Time = time.Now()
+		entry.Time = time.Now().UTC().Format(l.settingDateTimeFormat)
 	}
 
 	if l.settingShowCallerInfo || l.settingShowGoroutineID || (l.logFilterSpec.hasAnyFilterAPattern && len(l.logFilterSpec.filters) > 0) || (l.traceFilterSpec.hasAnyFilterAPattern && len(l.traceFilterSpec.filters) > 0) {
@@ -707,8 +707,14 @@ func (l *logger) Criticalf(format string, a ...interface{}) {
 	l.BasicLog(levelCrit, notATrace, "", format, a...)
 }
 
-func (l *logger) updateConfig(env Config) {
-	//
+// WithField returns a new sublogger with the new field in the context.
+func WithField(name string, value interface{}) Logger {
+	return defaultLogger.WithField(name, value)
+}
+
+// WithFields returns a new sublogger with the new fields in the context.
+func WithFields(fields Fields) Logger {
+	return defaultLogger.WithFields(fields)
 }
 
 func Trace(traceLevel int, a ...interface{}) {
