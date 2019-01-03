@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type LogFormatter interface {
@@ -14,8 +15,7 @@ type LogFormatter interface {
 	Format(entry *Entry) []byte
 }
 
-type TextFormatter struct {
-}
+type TextFormatter struct{}
 
 var (
 	textFormatterDatePrefix         = []byte(`date="`)
@@ -27,10 +27,23 @@ var (
 	textFormatterQuoteArr           = []byte(`"`)
 	textFormatterQuoteEscaped       = []byte(`\\"`)
 	textFormatterLineEnding         = byte('\n')
+	outputPool                      = sync.Pool{
+		New: func() interface{} {
+			return make([]byte, 0, 512)
+		},
+	}
 )
 
+func AcquireOutput() []byte {
+	return outputPool.Get().([]byte)[0:0]
+}
+
+func ReleaseOutput(data []byte) {
+	outputPool.Put(data)
+}
+
 func (formatter *TextFormatter) Format(entry *Entry) []byte {
-	output := make([]byte, 0, 512)
+	output := AcquireOutput()
 
 	if !entry.Time.IsZero() {
 		output = append(output, textFormatterDatePrefix...)

@@ -591,6 +591,7 @@ func (l *logger) BasicLog(logLevel Level, traceLevel int, additionalInformation 
 	if l.logWriterFile != nil {
 		l.logWriterFile.Print(string(line))
 	}
+	ReleaseOutput(line)
 }
 
 func (l *logger) WithField(name string, value interface{}) Logger {
