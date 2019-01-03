@@ -200,7 +200,7 @@ var _ = Describe("RLog Test Suite", func() {
 			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="CRITICAL" msg="this is a CRITICAL with format enabled"`))
 		})
 
-		It("should ingore CRITICAL when level is NONE", func() {
+		It("should ignore CRITICAL when level is NONE", func() {
 			logger, err := NewLogger(Config{
 				LogNoTime: true,
 				LogLevel:  "NONE",
@@ -409,7 +409,7 @@ func writeLogfile(lines []string) string {
 // checkLogFilter simplifies the checking of correct log levels in the tests.
 func checkLogFilter(t *testing.T, shouldPattern string, shouldLevel int) {
 	f := defaultLogger.logFilterSpec.filters[0]
-	if f.Pattern != shouldPattern || f.Level != shouldLevel {
+	if f.Pattern != shouldPattern || int(f.Level) != shouldLevel {
 		t.Fatalf("Incorrect default filter '%s' / %d. Should be: '%s' / %d",
 			f.Pattern, f.Level, shouldPattern, shouldLevel)
 	}
@@ -439,5 +439,46 @@ func TestRaceConditions(t *testing.T) {
 				Trace(4, "Some trace")
 			}
 		}(conf, i)
+	}
+}
+
+func BenchmarkRLog(b *testing.B) {
+	buff := bytes.NewBuffer(nil)
+	logger, err := NewLogger(Config{
+		TraceLevel: "30",
+	})
+	if err != nil {
+		panic(err)
+	}
+	logger.SetOutput(buff)
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		logger.Trace(1, "this is a test")
+	}
+}
+
+func BenchmarkWithFields(b *testing.B) {
+	buff := bytes.NewBuffer(nil)
+	loggerMaster, err := NewLogger(Config{
+		TraceLevel: "30",
+	})
+	if err != nil {
+		panic(err)
+	}
+	loggerMaster.SetOutput(buff)
+	logger := loggerMaster.WithFields(Fields{
+		"var1": "value1",
+		"var2": "value2",
+		"var3": "value3",
+		"var4": "value4",
+	})
+	b.ResetTimer()
+	for n := 0; n < b.N; n++ {
+		// logger.Critical("this is a test")
+		// logger.Error("this is a test")
+		// logger.Warn("this is a test")
+		logger.Info("this is a test")
+		// logger.Debug("this is a test")
+		// logger.Trace(1, "this is a test")
 	}
 }

@@ -3,28 +3,73 @@ package rlog
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
 type LogFormatter interface {
-	Format(key string, data interface{}) string
+	FormatField(key string, data interface{}) string
 	FormatFields(Fields) string
 	Separator() string
-	Line(date string, levelDecoration string, callerInfo string, msg string) string
+	Format(entry *Entry) []byte
 }
 
-type TextFormatter struct{}
+type TextFormatter struct {
+}
 
-func (formatter *TextFormatter) Line(date string, levelDecoration string, callerInfo string, msg string) string {
-	buff := bytes.NewBuffer(nil)
-	if date != "" {
-		buff.WriteString(fmt.Sprintf(`date="%s" `, date))
+var (
+	textFormatterDatePrefix         = []byte(`date="`)
+	textFormatterLevelPrefix        = []byte(`level="`)
+	textFormatterMessagePrefix      = []byte(`msg="`)
+	textFormatterSeparator          = byte(' ')
+	textFormatterQuoteWithSeparator = []byte(`" `)
+	textFormatterQuote              = byte('"')
+	textFormatterQuoteArr           = []byte(`"`)
+	textFormatterQuoteEscaped       = []byte(`\\"`)
+	textFormatterLineEnding         = byte('\n')
+)
+
+func (formatter *TextFormatter) Format(entry *Entry) []byte {
+	output := make([]byte, 0, 512)
+
+	if !entry.Time.IsZero() {
+		output = append(output, textFormatterDatePrefix...)
+		output = append(output, []byte(entry.Time.String())...)
+		output = append(output, textFormatterQuoteWithSeparator...)
 	}
-	buff.WriteString(fmt.Sprintf(`level="%s" %s%s`, levelDecoration, callerInfo, msg))
-	return buff.String()
+	output = append(output, textFormatterLevelPrefix...)
+	levelBytes := entry.Level.Bytes()
+	lw := levelWidth - len(levelBytes)
+	output = append(output, levelBytes...)
+	if entry.Level == levelTrace && entry.TraceLevel > notATrace {
+		s := strconv.Itoa(entry.TraceLevel)
+		lw -= 2 + len(s)
+		output = append(output, '(')
+		output = append(output, s...)
+		output = append(output, ')')
+	}
+
+	separator := true
+	if entry.Fields != "" {
+		output = append(output, textFormatterQuoteWithSeparator...)
+		output = append(output, entry.Fields...)
+		if entry.Message != "" {
+			output = append(output, textFormatterSeparator)
+		}
+		separator = false
+	}
+
+	if separator {
+		output = append(output, textFormatterQuoteWithSeparator...)
+	}
+	if entry.Message != "" {
+		output = append(output, textFormatterMessagePrefix...)
+		output = append(output, bytes.Replace([]byte(entry.Message), textFormatterQuoteArr, textFormatterQuoteEscaped, -1)...)
+	}
+	return append(output, textFormatterQuote, textFormatterLineEnding)
 }
 
-func (formatter *TextFormatter) Format(key string, data interface{}) string {
+func (formatter *TextFormatter) FormatField(key string, data interface{}) string {
 	return fmt.Sprintf(`%s="%s"`, key, strings.Replace(fmt.Sprint(data), `"`, `\\"`, -1))
 }
 
@@ -32,7 +77,7 @@ func (formatter *TextFormatter) FormatFields(fields Fields) string {
 	s := make([]string, len(fields))
 	i := 0
 	for key, value := range fields {
-		s[i] = formatter.Format(key, value)
+		s[i] = formatter.FormatField(key, value)
 		i++
 	}
 	return strings.Join(s, formatter.Separator())
