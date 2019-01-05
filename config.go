@@ -126,6 +126,6 @@ var configFromEnvVars Config
 func configFromEnv() Config {
 	// Read the initial configuration from the environment variables
 	var config Config
-	config.LoadFromEnv(" RLOG")
+	config.LoadFromEnv("RLOG")
 	return config
 }
