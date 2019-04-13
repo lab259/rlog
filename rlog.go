@@ -396,18 +396,7 @@ func NewLogger(config Config) (*logger, error) {
 	newLogFilterSpec := new(filterSpec)
 	newLogFilterSpec.fromString(config.LogLevel, false, levelInfo)
 
-	var formatter LogFormatter
-	switch config.Formatter {
-	case "", "default":
-		formatter = NewDefaultFormatter()
-	case "text":
-		formatter = &TextFormatter{}
-	default:
-		return nil, fmt.Errorf("formatter '%s' is unknown", config.Formatter)
-	}
-
 	l := &logger{
-		formatter:       formatter,
 		traceFilterSpec: newTraceFilterSpec,
 		logFilterSpec:   newLogFilterSpec,
 	}
@@ -441,6 +430,19 @@ func NewLogger(config Config) (*logger, error) {
 	} else {
 		// l.logWriterStream = log.New(os.Stderr, "", 0)
 		l.logWriterStream = os.Stderr
+	}
+
+	switch config.Formatter {
+	case "", "default":
+		if f, ok := l.logWriterStream.(*os.File); ok {
+			l.formatter = NewDefaultFormatter(f)
+		} else {
+			l.formatter = NewDefaultFormatter(f)
+		}
+	case "text":
+		l.formatter = &TextFormatter{}
+	default:
+		return nil, fmt.Errorf("formatter '%s' is unknown", config.Formatter)
 	}
 
 	// ... but if requested we'll also create and/or append to a logfile

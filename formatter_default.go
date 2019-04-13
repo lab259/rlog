@@ -17,26 +17,32 @@ type defaultFormatter struct {
 	Width  uint
 }
 
-var DefaultFormatter = NewDefaultFormatter()
-
-func clr(value ...color.Attribute) Color {
+func clr(file *os.File, value ...color.Attribute) Color {
 	c := color.New(value...)
-	c.EnableColor()
+	if file != nil && terminal.IsTerminal(int(file.Fd())) {
+		c.EnableColor()
+	} else {
+		c.DisableColor()
+	}
 	return c.Sprint
 }
 
-func NewDefaultFormatter() *defaultFormatter {
+func newClrs(file *os.File) map[Level]Color {
+	return map[Level]Color{
+		levelNone:  fmt.Sprint,
+		levelCrit:  clr(file, color.BgRed, color.FgWhite),
+		levelErr:   clr(file, color.FgRed),
+		levelWarn:  clr(file, color.FgYellow),
+		levelInfo:  clr(file, color.FgCyan),
+		levelDebug: clr(file, color.FgMagenta),
+		levelTrace: clr(file, color.FgHiBlack),
+	}
+}
+
+func NewDefaultFormatter(file *os.File) *defaultFormatter {
 	return &defaultFormatter{
-		Colors: map[Level]Color{
-			levelNone:  fmt.Sprint,
-			levelCrit:  clr(color.BgRed, color.FgWhite),
-			levelErr:   clr(color.FgRed),
-			levelWarn:  clr(color.FgYellow),
-			levelInfo:  clr(color.FgCyan),
-			levelDebug: clr(color.FgMagenta),
-			levelTrace: clr(color.FgHiBlack),
-		},
-		Width: 100,
+		Colors: newClrs(file),
+		Width:  100,
 	}
 }
 
