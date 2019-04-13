@@ -48,6 +48,7 @@ func (config *Config) LoadFromEnv(prefix string) {
 	}
 	// Read the initial configuration from the environment variables
 	*config = Config{
+		Formatter:       os.Getenv(fmt.Sprintf("%s_FORMATTER", prefix)),
 		LogLevel:        os.Getenv(fmt.Sprintf("%s_LOG_LEVEL", prefix)),
 		TraceLevel:      os.Getenv(fmt.Sprintf("%s_TRACE_LEVEL", prefix)),
 		logTimeFormat:   os.Getenv(fmt.Sprintf("%s_TIME_FORMAT", prefix)),
@@ -78,6 +79,8 @@ func (config *Config) loadFromStream(stream io.Reader) error {
 		val := strings.TrimSpace(tokens[1])
 
 		switch name {
+		case "RLOG_FORMATTER":
+			config.Formatter = val
 		case "RLOG_LOG_LEVEL":
 			config.LogLevel = val
 		case "RLOG_TRACE_LEVEL":

@@ -398,7 +398,9 @@ func NewLogger(config Config) (*logger, error) {
 
 	var formatter LogFormatter
 	switch config.Formatter {
-	case "text", "":
+	case "", "default":
+		formatter = NewDefaultFormatter()
+	case "text":
 		formatter = &TextFormatter{}
 	default:
 		return nil, fmt.Errorf("formatter '%s' is unknown", config.Formatter)

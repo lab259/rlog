@@ -2,9 +2,10 @@ package rlog
 
 import (
 	"bytes"
+	"strings"
+
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"strings"
 )
 
 var _ = Describe("Logger", func() {
@@ -24,7 +25,7 @@ var _ = Describe("Logger", func() {
 			})
 			sublogger.Info("this is in a sublogger")
 			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="INFO" msg="this is a INFO"
-level="INFO" var1="value1" msg="this is in a sublogger"`))
+level="INFO" var1=value1 msg="this is in a sublogger"`))
 		})
 
 		It("should aggregate fields in sequence", func() {
@@ -42,7 +43,7 @@ level="INFO" var1="value1" msg="this is in a sublogger"`))
 				WithField("var2", "value2")
 			sublogger.Info("this is in a sublogger")
 			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="INFO" msg="this is a INFO"
-level="INFO" var1="value1" var2="value2" msg="this is in a sublogger"`))
+level="INFO" var1=value1 var2=value2 msg="this is in a sublogger"`))
 		})
 	})
 })

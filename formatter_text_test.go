@@ -9,12 +9,12 @@ var _ = Describe("Formatter", func() {
 	Describe("TextFormatter", func() {
 		It("should format a field", func() {
 			f := &TextFormatter{}
-			Expect(f.FormatField("key", "value")).To(Equal(`key="value"`))
+			Expect(f.FormatField("key", "value")).To(Equal(`key=value`))
 		})
 
 		It("should format a field escaping values", func() {
 			f := &TextFormatter{}
-			Expect(f.FormatField("key", `value with "quotes"`)).To(Equal(`key="value with \\"quotes\\""`))
+			Expect(f.FormatField("key", `value with "quotes"`)).To(Equal(`key="value with \"quotes\""`))
 		})
 
 		It("should format fields", func() {
@@ -23,9 +23,9 @@ var _ = Describe("Formatter", func() {
 				"field1": "value1",
 				"field2": "value2",
 			})
-			Expect(fields).To(ContainSubstring(`field1="value1"`))
+			Expect(fields).To(ContainSubstring(`field1=value1`))
 			Expect(fields).To(ContainSubstring(f.Separator()))
-			Expect(fields).To(ContainSubstring(`field2="value2"`))
+			Expect(fields).To(ContainSubstring(`field2=value2`))
 		})
 	})
 })
