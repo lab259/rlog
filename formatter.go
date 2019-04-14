@@ -2,7 +2,7 @@ package rlog
 
 type LogFormatter interface {
 	FormatField(key string, data interface{}) string
-	FormatFields(Fields) string
+	FormatFields(FieldsArr) string
 	Separator() string
 	Format(entry *Entry) []byte
 }

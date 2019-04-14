@@ -1,14 +1,15 @@
 package main
 
 import (
-	"github.com/lab259/rlog"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/lab259/rlog"
 )
 
 func main() {
-	rlog.Info("Starting system")
+	rlog.WithField("scope", "system").Info("Starting system")
 	var wg sync.WaitGroup
 	for i := 0; i < 100; i++ {
 		wg.Add(1)

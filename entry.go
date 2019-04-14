@@ -9,15 +9,16 @@ type EntryCallerInfo struct {
 }
 
 type Entry struct {
-	Time       string
-	CallerInfo EntryCallerInfo
-	Level      Level
-	TraceLevel int
-	Fields     string
-	Message    string
+	Time        string
+	CallerInfo  EntryCallerInfo
+	Level       Level
+	TraceLevel  int
+	FieldsCache string
+	Fields      FieldsArr
+	Message     string
 }
 
 func (entry *Entry) Reset() {
-	entry.Fields = ""
+	entry.FieldsCache = ""
 	entry.Message = ""
 }

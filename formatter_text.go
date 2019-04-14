@@ -48,9 +48,9 @@ func (formatter *TextFormatter) Format(entry *Entry) []byte {
 	}
 
 	separator := true
-	if entry.Fields != "" {
+	if entry.FieldsCache != "" {
 		output = append(output, textFormatterQuoteWithSeparator...)
-		output = append(output, entry.Fields...)
+		output = append(output, entry.FieldsCache...)
 		if entry.Message != "" {
 			output = append(output, textFormatterSeparator)
 		}
@@ -76,12 +76,14 @@ func (formatter *TextFormatter) FormatField(key string, data interface{}) string
 	return fmt.Sprintf(`%s=%s`, key, s)
 }
 
-func (formatter *TextFormatter) FormatFields(fields Fields) string {
+func (formatter *TextFormatter) FormatFields(fields FieldsArr) string {
 	s := make([]string, len(fields))
-	i := 0
-	for key, value := range fields {
-		s[i] = formatter.FormatField(key, value)
-		i++
+	for i := 0; i < len(fields); i += 2 {
+		key, ok := fields[i].(string)
+		if !ok {
+			key = fmt.Sprint(key)
+		}
+		s[i/2] = formatter.FormatField(key, fields[i+1])
 	}
 	return strings.Join(s, formatter.Separator())
 }

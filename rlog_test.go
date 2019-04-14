@@ -19,15 +19,17 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/jamillosantos/macchiato"
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jamillosantos/macchiato"
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 func TestRLog(t *testing.T) {
@@ -491,4 +493,47 @@ func BenchmarkWithCallerInfo(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		logger.Info("this is a test")
 	}
+}
+
+func BenchmarkMaps(b *testing.B) {
+	b.ResetTimer()
+	s := 0
+	for n := 0; n < b.N; n++ {
+		m := map[string]interface{}{
+			fmt.Sprint("key", rand.Intn(100000)): rand.Intn(1000),
+			fmt.Sprint("key", rand.Intn(100000)): rand.Intn(1000),
+			fmt.Sprint("key", rand.Intn(100000)): rand.Intn(1000),
+			fmt.Sprint("key", rand.Intn(100000)): rand.Intn(1000),
+			fmt.Sprint("key", rand.Intn(100000)): rand.Intn(1000),
+		}
+		for _, v := range m {
+			i, ok := v.(int)
+			if ok {
+				s += i
+			}
+		}
+	}
+	fmt.Println(s)
+}
+
+func BenchmarkArrays(b *testing.B) {
+	b.ResetTimer()
+	s := 0
+	for n := 0; n < b.N; n++ {
+		m := []interface{}{
+			fmt.Sprint("key", rand.Intn(100000)), rand.Intn(1000),
+			fmt.Sprint("key", rand.Intn(100000)), rand.Intn(1000),
+			fmt.Sprint("key", rand.Intn(100000)), rand.Intn(1000),
+			fmt.Sprint("key", rand.Intn(100000)), rand.Intn(1000),
+			fmt.Sprint("key", rand.Intn(100000)), rand.Intn(1000),
+		}
+		for k := 0; k < len(m); k++ {
+			i, ok := m[k+1].(int)
+			if ok {
+				s += i
+			}
+			k++
+		}
+	}
+	fmt.Println(s)
 }
