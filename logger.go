@@ -79,7 +79,7 @@ func (logger *subLogger) BasicLog(logLevel Level, traceLevel int, additionalInfo
 	} else {
 		ai = additionalInformation
 	}
-	logger.logger.BasicLog(logLevel, traceLevel, ai, append(logger.additionalFields, fields), format, a...)
+	logger.logger.BasicLog(logLevel, traceLevel, ai, append(logger.additionalFields, fields...), format, a...)
 }
 
 // Trace is for low level tracing of activities. It takes an additional 'level'

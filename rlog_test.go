@@ -22,7 +22,6 @@ import (
 	"log"
 	"math/rand"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -171,39 +170,44 @@ var _ = Describe("RLog Test Suite", func() {
 
 	Describe("Levels", func() {
 		It("should place a INFO with date", func() {
-			logger, err := NewLogger(Config{})
+			logger, err := NewLogger(Config{
+				Formatter: "text",
+			})
 			buff := bytes.NewBuffer(nil)
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Critical("this is a CRITICAL")
 			Expect(strings.TrimSpace(buff.String())).To(HavePrefix(`date="`))
-			Expect(strings.TrimSpace(buff.String())).To(HaveSuffix(`level="CRITICAL" msg="this is a CRITICAL"`))
+			Expect(strings.TrimSpace(buff.String())).To(HaveSuffix(`level=CRITICAL msg="this is a CRITICAL"`))
 		})
 
 		It("should place a CRITICAL line", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 			})
 			buff := bytes.NewBuffer(nil)
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Critical("this is a CRITICAL")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="CRITICAL" msg="this is a CRITICAL"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=CRITICAL msg="this is a CRITICAL"`))
 		})
 
 		It("should place a CRITICAL line with format", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 			})
 			buff := bytes.NewBuffer(nil)
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Criticalf("this is a CRITICAL with format %s", "enabled")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="CRITICAL" msg="this is a CRITICAL with format enabled"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=CRITICAL msg="this is a CRITICAL with format enabled"`))
 		})
 
 		It("should ignore CRITICAL when level is NONE", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 				LogLevel:  "NONE",
 			})
@@ -216,28 +220,31 @@ var _ = Describe("RLog Test Suite", func() {
 
 		It("should place a ERROR line", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 			})
 			buff := bytes.NewBuffer(nil)
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Error("this is a ERROR")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="ERROR" msg="this is a ERROR"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=ERROR msg="this is a ERROR"`))
 		})
 
 		It("should place a ERROR line with format", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 			})
 			buff := bytes.NewBuffer(nil)
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Errorf("this is a ERROR with format %s", "enabled")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="ERROR" msg="this is a ERROR with format enabled"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=ERROR msg="this is a ERROR with format enabled"`))
 		})
 
 		It("should ingore ERROR when level is CRITICAL", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 				LogLevel:  "CRITICAL",
 			})
@@ -250,28 +257,31 @@ var _ = Describe("RLog Test Suite", func() {
 
 		It("should place a WARN line", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 			})
 			buff := bytes.NewBuffer(nil)
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Warn("this is a WARN")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="WARN" msg="this is a WARN"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=WARN msg="this is a WARN"`))
 		})
 
 		It("should place a WARN line with format", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 			})
 			buff := bytes.NewBuffer(nil)
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Warnf("this is a WARN with format %s", "enabled")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="WARN" msg="this is a WARN with format enabled"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=WARN msg="this is a WARN with format enabled"`))
 		})
 
 		It("should ingore WARN when level is CRITICAL", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 				LogLevel:  "WARN",
 			})
@@ -279,33 +289,36 @@ var _ = Describe("RLog Test Suite", func() {
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Warn("this is a WARN")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="WARN" msg="this is a WARN"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=WARN msg="this is a WARN"`))
 		})
 
 		It("should place a INFO line", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 			})
 			buff := bytes.NewBuffer(nil)
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Info("this is a INFO")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="INFO" msg="this is a INFO"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=INFO msg="this is a INFO"`))
 		})
 
 		It("should place a INFO line with format", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 			})
 			buff := bytes.NewBuffer(nil)
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Infof("this is a INFO with format %s", "enabled")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="INFO" msg="this is a INFO with format enabled"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=INFO msg="this is a INFO with format enabled"`))
 		})
 
 		It("should ingore INFO when level is WARN", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogNoTime: true,
 				LogLevel:  "WARN",
 			})
@@ -318,6 +331,7 @@ var _ = Describe("RLog Test Suite", func() {
 
 		It("should place a DEBUG line", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogLevel:  "DEBUG",
 				LogNoTime: true,
 			})
@@ -325,11 +339,12 @@ var _ = Describe("RLog Test Suite", func() {
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Debug("this is a DEBUG")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="DEBUG" msg="this is a DEBUG"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=DEBUG msg="this is a DEBUG"`))
 		})
 
 		It("should place a DEBUG line with format", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogLevel:  "DEBUG",
 				LogNoTime: true,
 			})
@@ -337,11 +352,12 @@ var _ = Describe("RLog Test Suite", func() {
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Debugf("this is a DEBUG with format %s", "enabled")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="DEBUG" msg="this is a DEBUG with format enabled"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=DEBUG msg="this is a DEBUG with format enabled"`))
 		})
 
 		It("should ingore DEBUG when level is INFO", func() {
 			logger, err := NewLogger(Config{
+				Formatter: "text",
 				LogLevel:  "INFO",
 				LogNoTime: true,
 			})
@@ -354,6 +370,7 @@ var _ = Describe("RLog Test Suite", func() {
 
 		It("should place a TRACE line", func() {
 			logger, err := NewLogger(Config{
+				Formatter:  "text",
 				LogLevel:   "DEBUG",
 				TraceLevel: "10",
 				LogNoTime:  true,
@@ -362,11 +379,12 @@ var _ = Describe("RLog Test Suite", func() {
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Trace(1, "this is a TRACE")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="TRACE(1)" msg="this is a TRACE"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=TRACE(1) msg="this is a TRACE"`))
 		})
 
 		It("should place a TRACE line with format", func() {
 			logger, err := NewLogger(Config{
+				Formatter:  "text",
 				LogLevel:   "DEBUG",
 				TraceLevel: "10",
 				LogNoTime:  true,
@@ -375,11 +393,12 @@ var _ = Describe("RLog Test Suite", func() {
 			logger.SetOutput(buff)
 			Expect(err).ToNot(HaveOccurred())
 			logger.Tracef(1, "this is a TRACE with format %s", "enabled")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="TRACE(1)" msg="this is a TRACE with format enabled"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=TRACE(1) msg="this is a TRACE with format enabled"`))
 		})
 
 		It("should ingore TRACE when trace level is greater than the set", func() {
 			logger, err := NewLogger(Config{
+				Formatter:  "text",
 				LogLevel:   "DEBUG",
 				LogNoTime:  true,
 				TraceLevel: "10",
@@ -390,8 +409,8 @@ var _ = Describe("RLog Test Suite", func() {
 			logger.Trace(9, "this is a TRACE(9)")
 			logger.Trace(10, "this is a TRACE(10)")
 			logger.Trace(11, "this is a TRACE(11)")
-			Expect(strings.TrimSpace(buff.String())).To(Equal(`level="TRACE(9)" msg="this is a TRACE(9)"
-level="TRACE(10)" msg="this is a TRACE(10)"`))
+			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=TRACE(9) msg="this is a TRACE(9)"
+level=TRACE(10) msg="this is a TRACE(10)"`))
 		})
 	})
 })
@@ -423,24 +442,23 @@ func TestRaceConditions(t *testing.T) {
 	conf := setup()
 	defer cleanup()
 
+	conf.TraceLevel = "10000"
+	logger, err := NewLogger(conf)
+	if err != nil {
+		panic(err)
+	}
+
 	for i := 0; i < 1000; i++ {
-		go func(conf Config, i int) {
+		go func(i int) {
 			for j := 0; j < 100; j++ {
-				// Change behaviour and config around a little
-				if j%2 == 0 {
-					conf.ShowCallerInfo = true
-				}
-				conf.TraceLevel = strconv.Itoa(j%10 - 1) // sometimes this will be -1
-				// //initialize(conf, j%3 == 0)
-				// initialize(conf, false)
-				Debug("Test Debug")
-				Info("Test Info")
-				Trace(1, "Some trace")
-				Trace(2, "Some trace")
-				Trace(3, "Some trace")
-				Trace(4, "Some trace")
+				logger.Debug("Test Debug")
+				logger.Info("Test Info")
+				logger.Trace(1, "Some trace")
+				logger.Trace(2, "Some trace")
+				logger.Trace(3, "Some trace")
+				logger.Trace(4, "Some trace")
 			}
-		}(conf, i)
+		}(i)
 	}
 }
 

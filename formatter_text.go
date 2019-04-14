@@ -12,7 +12,7 @@ type TextFormatter struct{}
 
 var (
 	textFormatterDatePrefix         = []byte(`date="`)
-	textFormatterLevelPrefix        = []byte(`level="`)
+	textFormatterLevelPrefix        = []byte(`level=`)
 	textFormatterMessagePrefix      = []byte(`msg="`)
 	textFormatterSeparator          = byte(' ')
 	textFormatterQuoteWithSeparator = []byte(`" `)
@@ -47,20 +47,13 @@ func (formatter *TextFormatter) Format(entry *Entry) []byte {
 		output = append(output, ')')
 	}
 
-	separator := true
 	if entry.FieldsCache != "" {
-		output = append(output, textFormatterQuoteWithSeparator...)
+		output = append(output, textFormatterSeparator)
 		output = append(output, entry.FieldsCache...)
-		if entry.Message != "" {
-			output = append(output, textFormatterSeparator)
-		}
-		separator = false
 	}
 
-	if separator {
-		output = append(output, textFormatterQuoteWithSeparator...)
-	}
 	if entry.Message != "" {
+		output = append(output, textFormatterSeparator)
 		output = append(output, textFormatterMessagePrefix...)
 		output = append(output, bytes.Replace([]byte(entry.Message), textFormatterQuoteArr, textFormatterQuoteEscaped, -1)...)
 	}
@@ -77,7 +70,7 @@ func (formatter *TextFormatter) FormatField(key string, data interface{}) string
 }
 
 func (formatter *TextFormatter) FormatFields(fields FieldsArr) string {
-	s := make([]string, len(fields))
+	s := make([]string, len(fields)/2)
 	for i := 0; i < len(fields); i += 2 {
 		key, ok := fields[i].(string)
 		if !ok {

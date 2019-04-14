@@ -388,6 +388,8 @@ func (l *logger) Formatter() LogFormatter {
 	return l.formatter
 }
 
+// NewLogger initializes a new instance loading all configuration set in the `config`
+// argument. Then, the new instance is returned ready for use.
 func NewLogger(config Config) (*logger, error) {
 	// initialize filters for trace (by default no trace output) and log levels
 	// (by default INFO level).
