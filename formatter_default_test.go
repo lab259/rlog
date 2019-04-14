@@ -21,9 +21,9 @@ var _ = Describe("Formatter", func() {
 
 		It("should format fields", func() {
 			f := NewDefaultFormatter(os.Stderr)
-			fields := f.FormatFields(Fields{
-				"field1": "value1",
-				"field2": "value2",
+			fields := f.FormatFields(FieldsArr{
+				"field1", "value1",
+				"field2", "value2",
 			})
 			Expect(fields).To(ContainSubstring(`field1=value1`))
 			Expect(fields).To(ContainSubstring(f.Separator()))
