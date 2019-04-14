@@ -42,7 +42,7 @@ func newClrs(file *os.File) map[Level]Color {
 func NewDefaultFormatter(file *os.File) *defaultFormatter {
 	return &defaultFormatter{
 		Colors: newClrs(file),
-		Width:  100,
+		Width:  60,
 	}
 }
 
