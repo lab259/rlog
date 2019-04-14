@@ -115,9 +115,25 @@ func (formatter *defaultFormatter) Format(entry *Entry) []byte {
 		trcLvl = entry.TraceLevel
 	}
 	output = append(output, fmt.Sprintf("[%05d]", trcLvl)...)
+
+	// If this entry has caller info
+	hasCallerInfo := entry.CallerInfo.PID > 0
+
+	// If this entry has GID
+	hasCallerInfoGID := entry.CallerInfo.GID > 0
+
+	if hasCallerInfo {
+		output = append(output, fmt.Sprintf(" [%-5d %s:%d %s] ", entry.CallerInfo.PID, entry.CallerInfo.FileName, entry.CallerInfo.Line, entry.CallerInfo.FunctionName)...)
+	}
+
+	if hasCallerInfoGID {
+		output = append(output, fmt.Sprintf("(%05d) ", entry.CallerInfo.GID)...)
+	}
+
+	// Prints message, if it is not empty
 	if entry.Message != "" {
 		output = append(output, formatter.Separator()...)
-		if hasFields {
+		if hasFields || hasCallerInfo {
 			output = append(output, fmt.Sprintf(fmt.Sprintf("%%-%ds", formatter.Width), entry.Message)...)
 		} else {
 			output = append(output, entry.Message...)
