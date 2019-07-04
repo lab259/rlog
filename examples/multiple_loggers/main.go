@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/lab259/rlog"
+	"github.com/lab259/rlog/v2"
 	"os"
 )
 

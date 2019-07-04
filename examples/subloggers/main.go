@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lab259/rlog"
+	"github.com/lab259/rlog/v2"
 )
 
 func main() {

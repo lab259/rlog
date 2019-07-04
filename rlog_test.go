@@ -22,12 +22,15 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/jamillosantos/macchiato"
+	"github.com/onsi/ginkgo"
 	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 )
 
@@ -40,7 +43,17 @@ func TestRLog(t *testing.T) {
 		}
 	}
 	RegisterFailHandler(Fail)
-	macchiato.RunSpecs(t, "RLog Test Suite")
+
+	description := "RLog Test Suite"
+	if os.Getenv("CI") == "" {
+		macchiato.RunSpecs(t, description)
+	} else {
+		reporterOutputDir := "./test-results/rlog"
+		os.MkdirAll(reporterOutputDir, os.ModePerm)
+		junitReporter := reporters.NewJUnitReporter(path.Join(reporterOutputDir, "results.xml"))
+		macchiatoReporter := macchiato.NewReporter()
+		ginkgo.RunSpecsWithCustomReporters(t, description, []ginkgo.Reporter{macchiatoReporter, junitReporter})
+	}
 }
 
 var logfile string
