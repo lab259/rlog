@@ -14,67 +14,65 @@ you need to (yeah, this is not so common).
 Additionally, based on the [sirupsen/logrus](https://github.com/sirupsen/logrus),
 the methods `WithField` and `WithFields` were added to provide contextualized
 "sub-loggers" that uses a "real logger". This strategy is very useful to append
-customer information in a multi-tenant logging environment, for example.   
+customer information in a multi-tenant logging environment, for example.
 
 ## Features
 
-* Logging configuration of a running process can be modified, without needing
+- Logging configuration of a running process can be modified, without needing
   to restart it. This allows for on-demand finer level logging, if a process
   starts to experience issues, for example.
-* Is configured through environment variables or config file: No need to call a
+- Is configured through environment variables or config file: No need to call a
   special init function of some kind to initialize and configure the logger.
-* A new config file can be specified and applied programmatically at any time.
-* Offers familiar and easy to use log functions for the usual levels: Debug,
+- A new config file can be specified and applied programmatically at any time.
+- Offers familiar and easy to use log functions for the usual levels: Debug,
   Info, Warn, Error and Critical.
-* Offers an additional multi level logging facility with arbitrary depth,
+- Offers an additional multi level logging facility with arbitrary depth,
   called Trace.
-* Log and trace levels can be configured separately for the individual files
+- Log and trace levels can be configured separately for the individual files
   that make up your executable.
-* Every log function comes in a 'plain' version (to be used like Println)
+- Every log function comes in a 'plain' version (to be used like Println)
   and in a formatted version (to be used like Printf). For example, there
   is Debug() and Debugf(), which takes a format string as first parameter.
-* Can be configured to print caller info (process ID, module filename and line,
+- Can be configured to print caller info (process ID, module filename and line,
   function name). In addition, can also print the goroutine ID in the caller
   info.
-* Has NO external dependencies, except things contained in the standard Go
+- Has NO external dependencies, except things contained in the standard Go
   library.
-* Fully configurable date/time format.
-* Logging of date and time can be disabled (useful in case of systemd, which
+- Fully configurable date/time format.
+- Logging of date and time can be disabled (useful in case of systemd, which
   adds its own time stamps in its log database).
-* By default logs to stderr or stdout. A logfile can be configured via
+- By default logs to stderr or stdout. A logfile can be configured via
   environment variable. Output may happen exclusively to the logfile or in
   addition to the output on stderr/stdout. Also, a different output stream
   or file can be specified from within your programs at any time.
-
 
 ## Defaults
 
 Rlog comes with reasonable defaults, so you can just start using it without any
 configuration at all. By default:
 
-* Log level set to INFO.
-* Trace messages are not logged.
-* Time stamps are logged with each message.
-* No caller information.
-* Output is sent to stderr.
+- Log level set to INFO.
+- Trace messages are not logged.
+- Time stamps are logged with each message.
+- No caller information.
+- Output is sent to stderr.
 
 All those defaults can easily be changed through environment variables or the
 config file.
-
 
 ## Controlling rlog through environment or config file variables
 
 Rlog is configured via the following settings, which may either be defined as
 environment variables or via a config file.
 
-* `RLOG_LOG_LEVEL`: Set to "DEBUG", "INFO", "WARN", "ERROR", "CRITICAL" or
+- `RLOG_LOG_LEVEL`: Set to "DEBUG", "INFO", "WARN", "ERROR", "CRITICAL" or
   "NONE". Any message of a level >= than what's configured will be printed. If
   this is not defined it will default to "INFO". If it is set to "NONE" then
   all logging is disabled, except Trace logs, which are controlled via a
   separate variable. In addition, log levels can be set for individual files
   (see below for more information). Default: INFO - meaning that INFO and
   higher is logged.
-* `RLOG_TRACE_LEVEL`: "Trace" log messages take an additional numeric level as
+- `RLOG_TRACE_LEVEL`: "Trace" log messages take an additional numeric level as
   first parameter. The user can specify an arbitrary number of levels. Set
   RLOG_TRACE_LEVEL to a number. All Trace messages with a level <=
   RLOG_TRACE_LEVEL will be printed. If this variable is undefined, or set to -1
@@ -83,32 +81,32 @@ environment variables or via a config file.
   output becomes. In addition, trace levels can be set for individual files
   (see below for more information). Default: Not set - meaning that no trace
   messages are logged.
-* `RLOG_CALLER_INFO`: If this variable is set to "1", "yes" or something else
+- `RLOG_CALLER_INFO`: If this variable is set to "1", "yes" or something else
   that evaluates to 'true' then the message also contains the caller
   information, consisting of the process ID, file and line number as well as
   function name from which the log message was called. Default: No - meaning
   that no caller info is logged.
-* `RLOG_GOROUTINE_ID`: If this variable is set to "1", "yes" or something else
+- `RLOG_GOROUTINE_ID`: If this variable is set to "1", "yes" or something else
   that evaluates to 'true' AND the printing of caller info is requested, then
   the caller info contains the goroutine ID, separated from the process ID by a
   ':'. Note that calculation of the goroutine ID has a performance impact, so
   please only enable this option if needed.
-* `RLOG_TIME_FORMAT`: Use this variable to customize the date/time format. The
+- `RLOG_TIME_FORMAT`: Use this variable to customize the date/time format. The
   format is specified either by the well known formats listed in
   https://golang.org/src/time/format.go, for example "UnixDate" or "RFC3339".
   Or as an example date/time output, which is described here:
   https://golang.org/pkg/time/#Time.Format Default: Not set - formatted
   according to RFC3339.
-* `RLOG_LOG_NOTIME`: If this variable is set to "1", "yes" or something else
+- `RLOG_LOG_NOTIME`: If this variable is set to "1", "yes" or something else
   that evaluates to 'true' then no date/time stamp is logged with each log
   message. This is useful in environments that use systemd where access to the
   logs via their logging tools already gives you time stamps. Default: No -
   meaning that time/date is logged.
-* `RLOG_LOG_FILE`: Provide a filename here to determine if the logfile should
+- `RLOG_LOG_FILE`: Provide a filename here to determine if the logfile should
   be written to a file, in addition to the output stream specified in
   RLOG_LOG_STREAM. Default: Not set - meaning that output is not written to a
   file.
-* `RLOG_LOG_STREAM`: Use this to direct the log output to a different output
+- `RLOG_LOG_STREAM`: Use this to direct the log output to a different output
   stream, instead of stderr. This accepts three values: "stderr", "stdout" or
   "none". If either stderr or stdout is defined here AND a logfile is specified
   via RLOG_LOG_FILE then the output is sent to both. Default: Not set -
@@ -117,7 +115,7 @@ environment variables or via a config file.
 There are two more settings, related to the configuration file, which can only
 be set via environment variables.
 
-* `RLOG_CONF_FILE`: If this variable is set then rlog looks for the config
+- `RLOG_CONF_FILE`: If this variable is set then rlog looks for the config
   file at the specified location, which needs to be the path of the
   file. If this variable is not defined, then rlog will look for the config
   file in `/etc/rlog/<your-executable-name>.conf`. Therefore, by default every
@@ -125,7 +123,7 @@ be set via environment variables.
   force multiple processes to share the same config file.
   Note that with the `SetConfFile()` function you can specify a new config file
   programmatically at any time, even with a relative path.
-* `RLOG_CONF_CHECK_INTERVAL`: Number of seconds between checking whether the
+- `RLOG_CONF_CHECK_INTERVAL`: Number of seconds between checking whether the
   config file has changed. By default, this is set to 15 seconds. This means
   that within 15 seconds a changed logging configuration in the config file
   will take effect. Note that this check is only performed when a log message
@@ -137,7 +135,6 @@ be set via environment variables.
 
 Please note! If these environment variables have incorrect or misspelled
 values then they will be silently ignored and a default value will be used.
-
 
 ## Using the config file
 
@@ -178,11 +175,11 @@ same name as the environment variable. So, your config file may look like this:
 
 A few notes about config file formatting:
 
-* Empty lines, or lines starting with '#' are ignored.
-* Leading and trailing spaces in lines are removed.
-* Everything after the first '=' will be taken as the value of the setting.
-* Leading and trailing spaces in values are removed.
-* Spaces or further '=' characters within values are taken as they are.
+- Empty lines, or lines starting with '#' are ignored.
+- Leading and trailing spaces in lines are removed.
+- Everything after the first '=' will be taken as the value of the setting.
+- Leading and trailing spaces in values are removed.
+- Spaces or further '=' characters within values are taken as they are.
 
 ### Combining configuration from environment variables and config file
 
@@ -207,7 +204,6 @@ An example of using '!' in the config file:
     RLOG_LOG_STREAM=stdout
     !RLOG_TIME_FORMAT=UnixDate
     RLOG_LOG_FILE=/var/log/myapp.log
-
 
 ## Updating the logging config of a running program
 
@@ -236,7 +232,6 @@ is done. But in short:
 
 Note that this will not change rlog behaviour if the value for this config
 setting was specified with a '!' in the config file.
-
 
 ## Per file level log and trace levels
 
@@ -291,23 +286,22 @@ INFO is assumed to be the global log level. If in RLOG_TRACE_LEVEL no global
 trace level is specified then -1 (no trace output) is assumed as the global
 trace level.
 
-
 ## Usage example
 
-    import "github.com/lab259/rlog"
+    import "github.com/lab259/rlog/v2"
 
     func main() {
- 	   rlog.Debug("A debug message: For the developer")
- 	   rlog.Info("An info message: Normal operation messages")
- 	   rlog.Warn("A warning message: Intermittent issues, high load, etc.")
- 	   rlog.Error("An error message: An error occurred, I will recover.")
- 	   rlog.Critical("A critical message: That's it! I give up!")
- 	   rlog.Trace(2, "A trace message")
- 	   rlog.Trace(3, "An even deeper trace message")
-    }
+
+rlog.Debug("A debug message: For the developer")
+rlog.Info("An info message: Normal operation messages")
+rlog.Warn("A warning message: Intermittent issues, high load, etc.")
+rlog.Error("An error message: An error occurred, I will recover.")
+rlog.Critical("A critical message: That's it! I give up!")
+rlog.Trace(2, "A trace message")
+rlog.Trace(3, "An even deeper trace message")
+}
 
 For a more interesting example, please check out 'examples/example.go'.
-
 
 ## Sample output
 
@@ -390,12 +384,12 @@ With custom time stamp:
 ## Usage with SubLoggers
 
     import (
-    	"github.com/lab259/rlog"
+    	"github.com/lab259/rlog/v2"
     	"math/rand"
     	"sync"
     	"time"
     )
-    
+
     func main() {
     	rlog.Info("Starting system")
     	var wg sync.WaitGroup
@@ -437,6 +431,6 @@ The output of this example looks like:
 
 ## Links
 
-* [Goreportcard.com](https://goreportcard.com/report/github.com/lab259/rlog)
-* [Godoc.com](https://godoc.org/github.com/lab259/rlog)
-* [Gocover.io](http://gocover.io/github.com/lab259/rlog)
+- [Goreportcard.com](https://goreportcard.com/report/github.com/lab259/rlog)
+- [Godoc.com](https://godoc.org/github.com/lab259/rlog)
+- [Gocover.io](http://gocover.io/github.com/lab259/rlog)

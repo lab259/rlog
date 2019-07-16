@@ -1,20 +1,24 @@
-GOPATH=$(CURDIR)/../../../../
-GOPATHCMD=GOPATH=$(GOPATH)
-
 COVERDIR=$(CURDIR)/.cover
 COVERAGEFILE=$(COVERDIR)/cover.out
 
-.PHONY: deps deps-ci coverage coverage-ci test test-watch coverage coverage-html
+EXAMPLES=$(shell ls ./examples)
+
+$(EXAMPLES): %:
+	$(eval EXAMPLE=$*)
+	@:
+
+run:
+	@test ! -z "$(EXAMPLE)" && go run ./examples/$(EXAMPLE) || echo "Usage: make [$(EXAMPLES)] run"
 
 test:
-	@${GOPATHCMD} ginkgo -race --failFast ./...
+	@ginkgo -race --failFast ./...
 
 test-watch:
-	@${GOPATHCMD} ginkgo watch -cover -r ./...
+	@ginkgo watch -cover -r ./...
 
 coverage-ci:
 	@mkdir -p $(COVERDIR)
-	@${GOPATHCMD} ginkgo -r -covermode=count --cover --trace ./
+	@ginkgo -r -covermode=count --cover --trace ./
 	@echo "mode: count" > "${COVERAGEFILE}"
 	@find ./* -type f -name *.coverprofile -exec grep -h -v "^mode:" {} >> "${COVERAGEFILE}" \; -exec rm -f {} \;
 
@@ -23,22 +27,12 @@ coverage: coverage-ci
 	@cp "${COVERAGEFILE}" coverage.txt
 
 coverage-html:
-	@$(GOPATHCMD) go tool cover -html="${COVERAGEFILE}" -o .cover/report.html
-
-dep-ensure:
-	@$(GOPATHCMD) dep ensure -v
-
-dep-update:
-	@$(GOPATHCMD) dep ensure -update -v
+	@go tool cover -html="${COVERAGEFILE}" -o .cover/report.html
 
 vet:
-	@$(GOPATHCMD) go vet ./...
+	@go vet ./...
 
 fmt:
-	@$(GOPATHCMD) go vet ./...
+	@go vet ./...
 
-dcup:
-	@docker-compose up -d
-
-dcdn:
-	@docker-compose down
+.PHONY: test test-watch coverage coverage-ci coverage-html vet fmt

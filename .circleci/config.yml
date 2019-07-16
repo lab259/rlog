@@ -1,0 +1,28 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1.12
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - deps-{{ .Branch }}-{{ checksum "go.sum" }}
+            - deps-{{ .Branch }}-
+            - deps-
+      - run:
+          name: Installing Ginkgo
+          command: go get github.com/onsi/ginkgo/ginkgo
+      - run:
+          name: Installing dependencies
+          command: go mod download
+      - run:
+          name: Run tests
+          command: make coverage-ci
+      - run: bash <(curl -s https://codecov.io/bash)
+      - save_cache:
+          key: deps-{{ .Branch }}-{{ checksum "go.sum" }}
+          paths:
+            - /go/pkg/mod
+      - store_test_results:
+          path: test-results
