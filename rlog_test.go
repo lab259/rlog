@@ -442,7 +442,7 @@ func writeLogfile(lines []string) string {
 
 // checkLogFilter simplifies the checking of correct log levels in the tests.
 func checkLogFilter(t *testing.T, shouldPattern string, shouldLevel int) {
-	f := defaultLogger.logFilterSpec.filters[0]
+	f := DefaultLogger.logFilterSpec.filters[0]
 	if f.Pattern != shouldPattern || int(f.Level) != shouldLevel {
 		t.Fatalf("Incorrect default filter '%s' / %d. Should be: '%s' / %d",
 			f.Pattern, f.Level, shouldPattern, shouldLevel)

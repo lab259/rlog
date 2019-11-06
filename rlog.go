@@ -266,7 +266,7 @@ func updateIfNeeded(oldVal string, newVal string, priority bool) string {
 func init() {
 	var err error
 
-	defaultLogger, err = NewLogger(configFromEnv())
+	DefaultLogger, err = NewLogger(configFromEnv())
 	if err != nil {
 		panic(err)
 	}
@@ -332,7 +332,7 @@ func (l *logger) SetOutput(writer io.Writer) {
 // somewhere else. If output to two destinations was specified via environment
 // variables then this will change it back to just one output.
 func SetOutput(writer io.Writer) {
-	defaultLogger.SetOutput(writer)
+	DefaultLogger.SetOutput(writer)
 }
 
 // isTrueBoolString tests a string to see if it represents a 'true' value.
@@ -382,7 +382,7 @@ type logger struct {
 	// name of current log file
 }
 
-var defaultLogger *logger
+var DefaultLogger *logger
 
 func (l *logger) Formatter() LogFormatter {
 	return l.formatter
@@ -719,19 +719,19 @@ func (l *logger) Criticalf(format string, a ...interface{}) {
 
 // WithField returns a new sublogger with the new field in the context.
 func WithField(name string, value interface{}) Logger {
-	return defaultLogger.WithField(name, value)
+	return DefaultLogger.WithField(name, value)
 }
 
 // WithFields returns a new sublogger with the new fields in the context.
 func WithFields(fields Fields) Logger {
-	return defaultLogger.WithFields(fields)
+	return DefaultLogger.WithFields(fields)
 }
 
 func Trace(traceLevel int, a ...interface{}) {
 	// There are possibly many trace messages. If trace logging isn't enabled
 	// then we want to get out of here as quickly as possible.
-	if len(defaultLogger.traceFilterSpec.filters) > 0 {
-		defaultLogger.BasicLog(levelTrace, traceLevel, "", nil, "", a...)
+	if len(DefaultLogger.traceFilterSpec.filters) > 0 {
+		DefaultLogger.BasicLog(levelTrace, traceLevel, "", nil, "", a...)
 	}
 }
 
@@ -739,37 +739,37 @@ func Trace(traceLevel int, a ...interface{}) {
 func Tracef(traceLevel int, format string, a ...interface{}) {
 	// There are possibly many trace messages. If trace logging isn't enabled
 	// then we want to get out of here as quickly as possible.
-	if len(defaultLogger.traceFilterSpec.filters) > 0 {
-		defaultLogger.BasicLog(levelTrace, traceLevel, "", nil, format, a...)
+	if len(DefaultLogger.traceFilterSpec.filters) > 0 {
+		DefaultLogger.BasicLog(levelTrace, traceLevel, "", nil, format, a...)
 	}
 }
 
 // Debug prints a message if RLOG_LEVEL is set to DEBUG.
 func Debug(a ...interface{}) {
-	defaultLogger.BasicLog(levelDebug, notATrace, "", nil, "", a...)
+	DefaultLogger.BasicLog(levelDebug, notATrace, "", nil, "", a...)
 }
 
 // Debugf prints a message if RLOG_LEVEL is set to DEBUG, with formatting.
 func Debugf(format string, a ...interface{}) {
-	defaultLogger.BasicLog(levelDebug, notATrace, "", nil, format, a...)
+	DefaultLogger.BasicLog(levelDebug, notATrace, "", nil, format, a...)
 }
 
 // Info prints a message if RLOG_LEVEL is set to INFO or lower.
 func Info(a ...interface{}) {
-	defaultLogger.BasicLog(levelInfo, notATrace, "", nil, "", a...)
+	DefaultLogger.BasicLog(levelInfo, notATrace, "", nil, "", a...)
 }
 
 // Infof prints a message if RLOG_LEVEL is set to INFO or lower, with
 // formatting.
 func Infof(format string, a ...interface{}) {
-	defaultLogger.BasicLog(levelInfo, notATrace, "", nil, format, a...)
+	DefaultLogger.BasicLog(levelInfo, notATrace, "", nil, format, a...)
 }
 
 // Println prints a message if RLOG_LEVEL is set to INFO or lower.
 // Println shouldn't be used except for backward compatibility
 // with standard log package, directly using Info is preferred way.
 func Println(a ...interface{}) {
-	defaultLogger.BasicLog(levelInfo, notATrace, "", nil, "", a...)
+	DefaultLogger.BasicLog(levelInfo, notATrace, "", nil, "", a...)
 }
 
 // Printf prints a message if RLOG_LEVEL is set to INFO or lower, with
@@ -777,38 +777,38 @@ func Println(a ...interface{}) {
 // Printf shouldn't be used except for backward compatibility
 // with standard log package, directly using Infof is preferred way.
 func Printf(format string, a ...interface{}) {
-	defaultLogger.BasicLog(levelInfo, notATrace, "", nil, format, a...)
+	DefaultLogger.BasicLog(levelInfo, notATrace, "", nil, format, a...)
 }
 
 // Warn prints a message if RLOG_LEVEL is set to WARN or lower.
 func Warn(a ...interface{}) {
-	defaultLogger.BasicLog(levelWarn, notATrace, "", nil, "", a...)
+	DefaultLogger.BasicLog(levelWarn, notATrace, "", nil, "", a...)
 }
 
 // Warnf prints a message if RLOG_LEVEL is set to WARN or lower, with
 // formatting.
 func Warnf(format string, a ...interface{}) {
-	defaultLogger.BasicLog(levelWarn, notATrace, "", nil, format, a...)
+	DefaultLogger.BasicLog(levelWarn, notATrace, "", nil, format, a...)
 }
 
 // Error prints a message if RLOG_LEVEL is set to ERROR or lower.
 func Error(a ...interface{}) {
-	defaultLogger.BasicLog(levelErr, notATrace, "", nil, "", a...)
+	DefaultLogger.BasicLog(levelErr, notATrace, "", nil, "", a...)
 }
 
 // Errorf prints a message if RLOG_LEVEL is set to ERROR or lower, with
 // formatting.
 func Errorf(format string, a ...interface{}) {
-	defaultLogger.BasicLog(levelErr, notATrace, "", nil, format, a...)
+	DefaultLogger.BasicLog(levelErr, notATrace, "", nil, format, a...)
 }
 
 // Critical prints a message if RLOG_LEVEL is set to CRITICAL or lower.
 func Critical(a ...interface{}) {
-	defaultLogger.BasicLog(levelCrit, notATrace, "", nil, "", a...)
+	DefaultLogger.BasicLog(levelCrit, notATrace, "", nil, "", a...)
 }
 
 // Criticalf prints a message if RLOG_LEVEL is set to CRITICAL or lower, with
 // formatting.
 func Criticalf(format string, a ...interface{}) {
-	defaultLogger.BasicLog(levelCrit, notATrace, "", nil, format, a...)
+	DefaultLogger.BasicLog(levelCrit, notATrace, "", nil, format, a...)
 }
