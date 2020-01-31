@@ -1,7 +1,5 @@
 package rlog
 
-import "fmt"
-
 type Fields map[string]interface{}
 
 type FieldsArr []interface{}
@@ -82,9 +80,11 @@ func (logger *subLogger) Formatter() LogFormatter {
 
 func (logger *subLogger) BasicLog(logLevel Level, traceLevel int, additionalInformation string, fields FieldsArr, format string, a ...interface{}) {
 	ai := logger.additionalInformation
-	if len(ai) > 0 && len(additionalInformation) > 0 {
-		ai = fmt.Sprint(ai, logger.Formatter().Separator(), additionalInformation)
-	} else {
+	if len(ai) > 0 {
+		if len(additionalInformation) > 0 {
+			ai = ai + logger.Formatter().Separator() + additionalInformation
+		}
+	} else if len(additionalInformation) > 0 {
 		ai = additionalInformation
 	}
 	if logger.prefix != "" {
@@ -98,7 +98,7 @@ func (logger *subLogger) BasicLog(logLevel Level, traceLevel int, additionalInfo
 }
 
 func (logger *subLogger) internalLog(logLevel Level, traceLevel int, format string, a ...interface{}) {
-	logger.logger.BasicLog(logLevel, traceLevel, logger.additionalInformation, logger.additionalFields, format, a...)
+	logger.BasicLog(logLevel, traceLevel, "", nil, format, a...)
 }
 
 // Trace is for low level tracing of activities. It takes an additional 'level'
