@@ -255,7 +255,7 @@ var _ = Describe("RLog Test Suite", func() {
 			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=ERROR msg="this is a ERROR with format enabled"`))
 		})
 
-		It("should ingore ERROR when level is CRITICAL", func() {
+		It("should ignore ERROR when level is CRITICAL", func() {
 			logger, err := NewLogger(Config{
 				Formatter: "text",
 				LogNoTime: true,
@@ -292,7 +292,7 @@ var _ = Describe("RLog Test Suite", func() {
 			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=WARN msg="this is a WARN with format enabled"`))
 		})
 
-		It("should ingore WARN when level is CRITICAL", func() {
+		It("should ignore WARN when level is CRITICAL", func() {
 			logger, err := NewLogger(Config{
 				Formatter: "text",
 				LogNoTime: true,
@@ -329,7 +329,7 @@ var _ = Describe("RLog Test Suite", func() {
 			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=INFO msg="this is a INFO with format enabled"`))
 		})
 
-		It("should ingore INFO when level is WARN", func() {
+		It("should ignore INFO when level is WARN", func() {
 			logger, err := NewLogger(Config{
 				Formatter: "text",
 				LogNoTime: true,
@@ -368,7 +368,7 @@ var _ = Describe("RLog Test Suite", func() {
 			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=DEBUG msg="this is a DEBUG with format enabled"`))
 		})
 
-		It("should ingore DEBUG when level is INFO", func() {
+		It("should ignore DEBUG when level is INFO", func() {
 			logger, err := NewLogger(Config{
 				Formatter: "text",
 				LogLevel:  "INFO",
@@ -409,7 +409,7 @@ var _ = Describe("RLog Test Suite", func() {
 			Expect(strings.TrimSpace(buff.String())).To(Equal(`level=TRACE(1) msg="this is a TRACE with format enabled"`))
 		})
 
-		It("should ingore TRACE when trace level is greater than the set", func() {
+		It("should ignore TRACE when trace level is greater than the set", func() {
 			logger, err := NewLogger(Config{
 				Formatter:  "text",
 				LogLevel:   "DEBUG",
