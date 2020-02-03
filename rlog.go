@@ -602,6 +602,12 @@ func (l *logger) BasicLog(logLevel Level, traceLevel int, additionalInformation 
 	ReleaseOutput(line)
 }
 
+func (l *logger) WithPrefix(prefix string) Logger {
+	sl := newSubLogger(l, nil)
+	sl.prefix = prefix
+	return sl
+}
+
 func (l *logger) WithField(name string, value interface{}) Logger {
 	return newSubLogger(l, FieldsArr{name, value})
 }
